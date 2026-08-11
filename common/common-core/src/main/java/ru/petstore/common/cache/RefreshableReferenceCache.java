@@ -1,0 +1,119 @@
+package ru.petstore.common.cache;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
+
+/**
+ * Reference data cache built on {@code java.util.concurrent}.
+ *
+ * <p>Two stores holding the same content: {@link ConcurrentHashMap} for lookups by key,
+ * {@link ConcurrentSkipListMap} for sorted ranges. A refresh replaces both under the write
+ * lock, otherwise a reader could observe a cleared map. Data is loaded outside the lock —
+ * only the swap happens under it.
+ */
+public class RefreshableReferenceCache<K extends Comparable<K>, V> {
+
+    private final String name;
+    private final Supplier<Map<K, V>> loader;
+
+    private final ConcurrentHashMap<K, V> byKey = new ConcurrentHashMap<>();
+    private final ConcurrentSkipListMap<K, V> sorted = new ConcurrentSkipListMap<>();
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    private final AtomicLong hits = new AtomicLong();
+    private final AtomicLong misses = new AtomicLong();
+
+    /** Opens after the first successful load; the readiness probe relies on it. */
+    private final CountDownLatch warmedUp = new CountDownLatch(1);
+
+    public RefreshableReferenceCache(String name, Supplier<Map<K, V>> loader) {
+        this.name = name;
+        this.loader = loader;
+    }
+
+    public Optional<V> get(K key) {
+        lock.readLock().lock();
+        try {
+            V value = byKey.get(key);
+            if (value == null) {
+                misses.incrementAndGet();
+                return Optional.empty();
+            }
+            hits.incrementAndGet();
+            return Optional.of(value);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<V> all() {
+        lock.readLock().lock();
+        try {
+            return List.copyOf(sorted.values());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public NavigableMap<K, V> range(K fromInclusive, K toInclusive) {
+        lock.readLock().lock();
+        try {
+            return new java.util.TreeMap<>(sorted.subMap(fromInclusive, true, toInclusive, true));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public void refresh() {
+        Map<K, V> fresh = loader.get();
+        lock.writeLock().lock();
+        try {
+            byKey.clear();
+            byKey.putAll(fresh);
+            sorted.clear();
+            sorted.putAll(fresh);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        warmedUp.countDown();
+    }
+
+    public boolean isWarmedUp() {
+        return warmedUp.getCount() == 0;
+    }
+
+    public boolean awaitWarmUp(Duration timeout) throws InterruptedException {
+        return warmedUp.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public long size() {
+        lock.readLock().lock();
+        try {
+            return byKey.size();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public long hits() {
+        return hits.get();
+    }
+
+    public long misses() {
+        return misses.get();
+    }
+}

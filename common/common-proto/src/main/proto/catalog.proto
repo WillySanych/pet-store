@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package petstore.catalog;
+
+option java_multiple_files = true;
+option java_package = "ru.petstore.proto.catalog";
+option java_outer_classname = "CatalogProto";
+
+service CatalogService {
+  rpc GetProducts (GetProductsRequest) returns (GetProductsResponse);
+}
+
+message GetProductsRequest {
+  repeated string product_ids = 1;
+}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string price = 3;
+  bool active = 4;
+}

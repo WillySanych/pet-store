@@ -19,6 +19,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      # Initialization runs with TCP closed, so those probes would count as failures: without
+      # this window the budget is only 50 seconds, and growing init scripts mark it unhealthy.
+      start_period: 30s
     networks: [petstore]
 
   kafka:
@@ -44,8 +47,10 @@ services:
     volumes:
       - kafkadata:/var/lib/kafka/data
     healthcheck:
+      # Every run boots a JVM and takes about two seconds, hence the sparse interval: failures
+      # are caught by start_period and retries, frequent polling at rest buys nothing.
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
-      interval: 10s
+      interval: 30s
       timeout: 10s
       retries: 10
       start_period: 20s
