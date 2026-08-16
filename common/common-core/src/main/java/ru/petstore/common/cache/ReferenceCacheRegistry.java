@@ -10,9 +10,6 @@ import ru.petstore.common.metrics.ServiceMetrics;
 
 /**
  * Warms up and periodically refreshes the reference caches of a service.
- *
- * <p>The refresh is not wrapped in ShedLock, unlike the other schedulers in the project:
- * it changes pod-local state only and must run on every replica.
  */
 public class ReferenceCacheRegistry {
 

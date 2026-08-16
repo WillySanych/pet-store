@@ -21,34 +21,53 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    private final ServiceMetrics metrics;
+    /** Seconds before retrying a 503. */
+    private static final String RETRY_AFTER_SECONDS = "5";
 
-    public GlobalExceptionHandler(ServiceMetrics metrics) {
-        this.metrics = metrics;
+    private final ServiceMetrics serviceMetrics;
+
+    public GlobalExceptionHandler(ServiceMetrics serviceMetrics) {
+        this.serviceMetrics = serviceMetrics;
     }
 
     @ExceptionHandler(OverloadedException.class)
-    public ResponseEntity<ApiError> handleOverloaded(OverloadedException e) {
-        metrics.recordError("overloaded");
+    public ResponseEntity<ApiErrorResponse> handleOverloaded(OverloadedException e) {
+        serviceMetrics.recordError("overloaded");
         log.warn("Request rejected due to overload: {}", e.endpoint());
         return body(HttpStatus.TOO_MANY_REQUESTS, "OVERLOADED", e.getMessage());
     }
 
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException e) {
+        serviceMetrics.recordError("not_found");
+        return body(HttpStatus.NOT_FOUND, "NOT_FOUND", e.getMessage());
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnavailable(ServiceUnavailableException e) {
+        serviceMetrics.recordError("unavailable");
+        log.warn("Request rejected, service not ready: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+                .body(ApiErrorResponse.of("SERVICE_UNAVAILABLE", e.getMessage(), requestId()));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException e) {
-        metrics.recordError("validation");
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
+        serviceMetrics.recordError("validation");
         return body(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException e) {
-        metrics.recordError("bad_request");
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
+        serviceMetrics.recordError("bad_request");
+        log.warn("Bad request: {}", e.getMessage(), e);
         return body(HttpStatus.BAD_REQUEST, "BAD_REQUEST", e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpected(Exception e) {
-        metrics.recordError("internal");
+    public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception e) {
+        serviceMetrics.recordError("internal");
         log.error("Unhandled error", e);
         return body(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal service error");
     }
@@ -63,9 +82,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("invalid request");
-        metrics.recordError("validation");
+        serviceMetrics.recordError("validation");
         return new ResponseEntity<>(
-                ApiError.of("VALIDATION_FAILED", details, requestId()), headers, status);
+                ApiErrorResponse.of("VALIDATION_FAILED", details, requestId()), headers, status);
     }
 
     /** Every standard Spring MVC exception passes through here and gets the common format. */
@@ -74,15 +93,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                              HttpHeaders headers,
                                                              HttpStatusCode status,
                                                              WebRequest request) {
-        metrics.recordError(status.is4xxClientError() ? "client_error" : "server_error");
+        serviceMetrics.recordError(status.is4xxClientError() ? "client_error" : "server_error");
         HttpStatus resolved = HttpStatus.resolve(status.value());
         String code = resolved != null ? resolved.name() : "ERROR";
         return new ResponseEntity<>(
-                ApiError.of(code, e.getMessage(), requestId()), headers, status);
+                ApiErrorResponse.of(code, e.getMessage(), requestId()), headers, status);
     }
 
-    private ResponseEntity<ApiError> body(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(ApiError.of(code, message, requestId()));
+    private ResponseEntity<ApiErrorResponse> body(HttpStatus status, String code, String message) {
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(code, message, requestId()));
     }
 
     private String requestId() {

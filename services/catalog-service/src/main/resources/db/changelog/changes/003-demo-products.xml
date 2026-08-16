@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="003-1-demo-products" author="petstore" context="demo">
+        <sql>
+            INSERT INTO product (id, sku, name, description, price, active,
+                                 category_id, species_id, brand_id, created_at, updated_at)
+            SELECT v.id::uuid, v.sku, v.name, v.description, v.price, v.active,
+                   c.id, s.id, b.id, now(), now()
+            FROM (VALUES
+                ('a0000000-0000-4000-8000-000000000001', 'RC-DOG-ADULT-3KG',
+                 'Royal Canin Medium Adult 3 кг', 'Сухой корм для взрослых собак средних пород',
+                 2499.00, true, 'FOOD', 'DOG', 'ROYAL_CANIN'),
+                ('a0000000-0000-4000-8000-000000000002', 'RC-CAT-STER-2KG',
+                 'Royal Canin Sterilised 37, 2 кг', 'Корм для стерилизованных кошек',
+                 1899.00, true, 'FOOD', 'CAT', 'ROYAL_CANIN'),
+                ('a0000000-0000-4000-8000-000000000003', 'PUR-DOG-DRY-10KG',
+                 'Purina ONE для собак 10 кг', 'Сухой корм с курицей и рисом',
+                 3990.00, true, 'FOOD', 'DOG', 'PURINA'),
+                ('a0000000-0000-4000-8000-000000000004', 'ACA-CAT-WILD-18KG',
+                 'Acana Wild Prairie Cat 1.8 кг', 'Беззерновой корм для кошек всех возрастов',
+                 2790.00, true, 'FOOD', 'CAT', 'ACANA'),
+                ('a0000000-0000-4000-8000-000000000005', 'TRX-TOY-BALL',
+                 'Trixie мяч на верёвке', 'Игрушка для активных игр и апортировки',
+                 349.00, true, 'TOYS', 'DOG', 'TRIXIE'),
+                ('a0000000-0000-4000-8000-000000000006', 'TRX-TOY-MOUSE',
+                 'Trixie мышка с кошачьей мятой', 'Мягкая игрушка для кошек',
+                 199.00, true, 'TOYS', 'CAT', 'TRIXIE'),
+                ('a0000000-0000-4000-8000-000000000007', 'FER-CAGE-BIRD-M',
+                 'Ferplast клетка для попугая', 'Клетка среднего размера с оснащением',
+                 5490.00, true, 'HOUSING', 'BIRD', 'FERPLAST'),
+                ('a0000000-0000-4000-8000-000000000008', 'FER-HOUSE-RODENT',
+                 'Ferplast домик для грызунов', 'Пластиковый домик с лестницей',
+                 1290.00, true, 'HOUSING', 'RODENT', 'FERPLAST'),
+                ('a0000000-0000-4000-8000-000000000009', 'PS-HYG-LITTER-5L',
+                 'PetStore наполнитель древесный 5 л', 'Впитывающий наполнитель для кошачьего туалета',
+                 459.00, true, 'HYGIENE', 'CAT', 'PETSTORE'),
+                ('a0000000-0000-4000-8000-000000000010', 'PS-HEALTH-VIT-DOG',
+                 'PetStore витамины для собак', 'Витаминный комплекс для шерсти и суставов',
+                 899.00, true, 'HEALTH', 'DOG', 'PETSTORE'),
+                ('a0000000-0000-4000-8000-000000000011', 'PS-AQUA-FILTER',
+                 'PetStore фильтр для аквариума', 'Внутренний фильтр на 100 литров',
+                 1590.00, true, 'ACCESSORIES', 'FISH', 'PETSTORE'),
+                ('a0000000-0000-4000-8000-000000000012', 'PS-TERRA-LAMP',
+                 'PetStore лампа для террариума', 'Снята с продажи, оставлена как неактивный товар',
+                 2190.00, false, 'ACCESSORIES', 'REPTILE', 'PETSTORE')
+            ) AS v (id, sku, name, description, price, active, category_code, species_code, brand_code)
+            JOIN category c ON c.code = v.category_code
+            JOIN species s ON s.code = v.species_code
+            JOIN brand b ON b.code = v.brand_code;
+        </sql>
+        <rollback>
+            DELETE FROM product WHERE id IN (
+                'a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002',
+                'a0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000004',
+                'a0000000-0000-4000-8000-000000000005', 'a0000000-0000-4000-8000-000000000006',
+                'a0000000-0000-4000-8000-000000000007', 'a0000000-0000-4000-8000-000000000008',
+                'a0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-000000000010',
+                'a0000000-0000-4000-8000-000000000011', 'a0000000-0000-4000-8000-000000000012');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -28,7 +28,7 @@ mvn clean install
 
 ## Локальная инфраструктура
 
-PostgreSQL, Kafka (KRaft), Prometheus и Grafana поднимаются одной командой:
+PostgreSQL, Kafka, Prometheus и Grafana поднимаются одной командой:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
@@ -45,7 +45,7 @@ docker compose -f deploy/docker-compose.yml up -d
 при первой инициализации тома скриптом `deploy/postgres/init/01-schemas.sql`.
 
 Остановить с сохранением данных — `docker compose -f deploy/docker-compose.yml stop`.
-Удалить вместе с томами — `... down -v` (init-скрипт отработает заново).
+Удалить вместе с томами — `... down -v`.
 
 ## Запуск сервиса
 
@@ -54,3 +54,13 @@ mvn -pl services/catalog-service spring-boot:run
 ```
 
 Проверка: http://localhost:8081/actuator/health и http://localhost:8081/actuator/prometheus
+
+### `catalog-service`
+
+Сама схема `catalog` появляется при первой инициализации тома PostgreSQL — её создаёт
+`deploy/postgres/init/01-schemas.sql` вместе с четырьмя остальными. Таблицы и справочники
+(`category`, `species`, `brand`) заводит в ней Liquibase при старте сервиса, поэтому
+инфраструктура из `docker-compose` должна быть поднята.
+
+Двенадцать демо-товаров лежат под контекстом `demo` и по умолчанию **не** добавляются —
+скрипт на их добавление находится в отдельном контексте: `LIQUIBASE_CONTEXTS=demo`.

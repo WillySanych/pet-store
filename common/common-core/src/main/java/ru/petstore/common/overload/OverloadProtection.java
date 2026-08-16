@@ -6,21 +6,21 @@ import ru.petstore.common.metrics.ServiceMetrics;
 
 /**
  * Overload protection following the bulkhead pattern: limits the number of concurrently
- * handled requests with a {@link Semaphore} from {@code java.util.concurrent}.
+ * handled requests with a {@link Semaphore}.
  */
 public class OverloadProtection {
 
     private final Semaphore permits;
-    private final ServiceMetrics metrics;
+    private final ServiceMetrics serviceMetrics;
 
-    public OverloadProtection(int maxConcurrent, ServiceMetrics metrics) {
+    public OverloadProtection(int maxConcurrent, ServiceMetrics serviceMetrics) {
         this.permits = new Semaphore(maxConcurrent);
-        this.metrics = metrics;
+        this.serviceMetrics = serviceMetrics;
     }
 
     public <T> T call(String endpoint, Supplier<T> action) {
         if (!permits.tryAcquire()) {
-            metrics.recordOverloadRejected(endpoint);
+            serviceMetrics.recordOverloadRejected(endpoint);
             throw new OverloadedException(endpoint);
         }
         try {

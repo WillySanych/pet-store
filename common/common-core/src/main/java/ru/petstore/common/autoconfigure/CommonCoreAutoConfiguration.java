@@ -17,9 +17,9 @@ import ru.petstore.common.web.RequestMetricsFilter;
 import ru.petstore.common.web.RequestTracingFilter;
 
 /**
- * Wires the common components so a service needs a single dependency on {@code common-core}.
- * Every bean is guarded by {@link ConditionalOnMissingBean} — a service can replace any of them
- * with its own without switching off the rest.
+ * Wires the common components so a service needs one dependency on {@code common-core}.
+ * {@link ConditionalOnMissingBean} on every bean lets a service replace any one of them
+ * without switching off the rest.
  */
 @AutoConfiguration
 @EnableScheduling

@@ -1,2 +1,2 @@
 org.springframework.boot.env.EnvironmentPostProcessor=\
-ru.petstore.common.autoconfigure.ReadinessGroupEnvironmentPostProcessor
+ru.petstore.common.autoconfigure.CommonDefaultsEnvironmentPostProcessor

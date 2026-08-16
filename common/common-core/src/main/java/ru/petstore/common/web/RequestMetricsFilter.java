@@ -19,10 +19,10 @@ public class RequestMetricsFilter extends OncePerRequestFilter implements Ordere
 
     private static final String UNKNOWN = "unknown";
 
-    private final ServiceMetrics metrics;
+    private final ServiceMetrics serviceMetrics;
 
-    public RequestMetricsFilter(ServiceMetrics metrics) {
-        this.metrics = metrics;
+    public RequestMetricsFilter(ServiceMetrics serviceMetrics) {
+        this.serviceMetrics = serviceMetrics;
     }
 
     @Override
@@ -32,7 +32,7 @@ public class RequestMetricsFilter extends OncePerRequestFilter implements Ordere
         try {
             chain.doFilter(request, response);
         } finally {
-            metrics.recordRequest(
+            serviceMetrics.recordRequest(
                     endpointTemplate(request),
                     response.getStatus(),
                     Duration.ofNanos(System.nanoTime() - startedAt));

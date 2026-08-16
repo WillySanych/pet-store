@@ -103,6 +103,35 @@ class RefreshableReferenceCacheTest {
     }
 
     @Test
+    @DisplayName("Пустая загрузка не считается прогревом: кеш остаётся закрытым для трафика")
+    void emptyFirstLoadDoesNotWarmUpTheCache() {
+        when(loader.get()).thenReturn(Map.of());
+        var cache = new RefreshableReferenceCache<String, String>("categories", loader);
+
+        cache.refresh();
+
+        assertThat(cache.isWarmedUp()).isFalse();
+        assertThat(cache.size()).isZero();
+    }
+
+    @Test
+    @DisplayName("Пустая перезагрузка сохраняет прежнее содержимое, а не обнуляет справочник")
+    void emptyRefreshKeepsTheLastGoodContent() {
+        when(loader.get())
+                .thenReturn(data("a", "Alpha", "b", "Bravo"))
+                .thenReturn(Map.of());
+        var cache = new RefreshableReferenceCache<>("categories", loader);
+
+        cache.refresh();
+        cache.refresh();
+
+        assertThat(cache.get("a")).contains("Alpha");
+        assertThat(cache.size()).isEqualTo(2);
+        assertThat(cache.isWarmedUp()).isTrue();
+        verify(loader, times(2)).get();
+    }
+
+    @Test
     @DisplayName("Ожидание прогрева отпускается после загрузки")
     void warmUpLatchReleasesAfterLoad() throws Exception {
         var slowLoader = new CountDownLatch(1);

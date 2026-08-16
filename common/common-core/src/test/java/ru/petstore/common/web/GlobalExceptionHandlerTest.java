@@ -2,12 +2,14 @@ package ru.petstore.common.web;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -50,6 +52,16 @@ class GlobalExceptionHandlerTest {
         String badArgument() {
             throw new IllegalArgumentException("invalid argument");
         }
+
+        @GetMapping("/missing")
+        String missing() {
+            throw ResourceNotFoundException.of("Product", 42);
+        }
+
+        @GetMapping("/not-ready")
+        String notReady() {
+            throw new ServiceUnavailableException("Reference data category is not loaded yet");
+        }
     }
 
     private final MockMvc mockMvc = MockMvcBuilders
@@ -71,6 +83,31 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/bad-argument"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @DisplayName("Отсутствующая сущность отдаёт 404, а не 500")
+    void notFoundReturns404() throws Exception {
+        mockMvc.perform(get("/missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Product 42 not found"));
+    }
+
+    @Test
+    @DisplayName("Неготовность сервиса отдаёт 503, а не 400: клиенту есть смысл повторить")
+    void notReadyReturns503() throws Exception {
+        mockMvc.perform(get("/not-ready"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value("Reference data category is not loaded yet"));
+    }
+
+    @Test
+    @DisplayName("503 несёт Retry-After: иначе интервал повтора остаётся на усмотрение клиента")
+    void notReadyCarriesRetryAfter() throws Exception {
+        mockMvc.perform(get("/not-ready"))
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "5"));
     }
 
     @Test

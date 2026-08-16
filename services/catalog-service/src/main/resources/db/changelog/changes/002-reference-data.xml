@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-1-categories" author="petstore">
+        <sql>
+            INSERT INTO category (code, name) VALUES
+                ('FOOD', 'Корма'),
+                ('TOYS', 'Игрушки'),
+                ('HYGIENE', 'Гигиена'),
+                ('ACCESSORIES', 'Аксессуары'),
+                ('HEALTH', 'Ветаптека'),
+                ('HOUSING', 'Домики и лежанки');
+        </sql>
+        <rollback>
+            DELETE FROM category WHERE code IN
+                ('FOOD', 'TOYS', 'HYGIENE', 'ACCESSORIES', 'HEALTH', 'HOUSING');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-2-species" author="petstore">
+        <sql>
+            INSERT INTO species (code, name) VALUES
+                ('DOG', 'Собаки'),
+                ('CAT', 'Кошки'),
+                ('BIRD', 'Птицы'),
+                ('FISH', 'Рыбы'),
+                ('RODENT', 'Грызуны'),
+                ('REPTILE', 'Рептилии');
+        </sql>
+        <rollback>
+            DELETE FROM species WHERE code IN
+                ('DOG', 'CAT', 'BIRD', 'FISH', 'RODENT', 'REPTILE');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-3-brands" author="petstore">
+        <sql>
+            INSERT INTO brand (code, name) VALUES
+                ('ROYAL_CANIN', 'Royal Canin'),
+                ('PURINA', 'Purina'),
+                ('ACANA', 'Acana'),
+                ('TRIXIE', 'Trixie'),
+                ('FERPLAST', 'Ferplast'),
+                ('PETSTORE', 'PetStore');
+        </sql>
+        <rollback>
+            DELETE FROM brand WHERE code IN
+                ('ROYAL_CANIN', 'PURINA', 'ACANA', 'TRIXIE', 'FERPLAST', 'PETSTORE');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

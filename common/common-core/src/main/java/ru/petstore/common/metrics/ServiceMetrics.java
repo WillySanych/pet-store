@@ -19,10 +19,10 @@ public class ServiceMetrics {
     public static final String UPSTREAM_RETRIES = "petstore.upstream.retries";
     public static final String OVERLOAD_REJECTED = "petstore.overload.rejected";
 
-    private final MeterRegistry registry;
+    private final MeterRegistry meterRegistry;
 
-    public ServiceMetrics(MeterRegistry registry) {
-        this.registry = registry;
+    public ServiceMetrics(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
     }
 
     public void recordRequest(String endpoint, int status, Duration duration) {
@@ -30,37 +30,37 @@ public class ServiceMetrics {
                 .tag("endpoint", endpoint)
                 .tag("status", String.valueOf(status))
                 .tag("outcome", status < 400 ? "success" : "failure")
-                .register(registry)
+                .register(meterRegistry)
                 .increment();
 
         Timer.builder(REQUEST_DURATION)
                 .tag("endpoint", endpoint)
                 .publishPercentileHistogram()
-                .register(registry)
+                .register(meterRegistry)
                 .record(duration);
     }
 
     public void recordError(String type) {
-        Counter.builder(ERRORS).tag("type", type).register(registry).increment();
+        Counter.builder(ERRORS).tag("type", type).register(meterRegistry).increment();
     }
 
     public void recordUpstreamRetry(String upstream) {
-        Counter.builder(UPSTREAM_RETRIES).tag("upstream", upstream).register(registry).increment();
+        Counter.builder(UPSTREAM_RETRIES).tag("upstream", upstream).register(meterRegistry).increment();
     }
 
     public void recordOverloadRejected(String endpoint) {
-        Counter.builder(OVERLOAD_REJECTED).tag("endpoint", endpoint).register(registry).increment();
+        Counter.builder(OVERLOAD_REJECTED).tag("endpoint", endpoint).register(meterRegistry).increment();
     }
 
     public void bindCache(RefreshableReferenceCache<?, ?> cache) {
         Gauge.builder(CACHE_SIZE, cache, RefreshableReferenceCache::size)
                 .tag("cache", cache.name())
-                .register(registry);
+                .register(meterRegistry);
         FunctionCounter.builder(CACHE_HITS, cache, RefreshableReferenceCache::hits)
                 .tag("cache", cache.name())
-                .register(registry);
+                .register(meterRegistry);
         FunctionCounter.builder(CACHE_MISSES, cache, RefreshableReferenceCache::misses)
                 .tag("cache", cache.name())
-                .register(registry);
+                .register(meterRegistry);
     }
 }

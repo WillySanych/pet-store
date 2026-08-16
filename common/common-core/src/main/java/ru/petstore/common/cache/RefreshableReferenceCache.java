@@ -12,16 +12,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Reference data cache built on {@code java.util.concurrent}.
- *
- * <p>Two stores holding the same content: {@link ConcurrentHashMap} for lookups by key,
- * {@link ConcurrentSkipListMap} for sorted ranges. A refresh replaces both under the write
- * lock, otherwise a reader could observe a cleared map. Data is loaded outside the lock —
- * only the swap happens under it.
+ * Reference data cache
  */
 public class RefreshableReferenceCache<K extends Comparable<K>, V> {
+
+    private static final Logger log = LoggerFactory.getLogger(RefreshableReferenceCache.class);
 
     private final String name;
     private final Supplier<Map<K, V>> loader;
@@ -33,7 +32,7 @@ public class RefreshableReferenceCache<K extends Comparable<K>, V> {
     private final AtomicLong hits = new AtomicLong();
     private final AtomicLong misses = new AtomicLong();
 
-    /** Opens after the first successful load; the readiness probe relies on it. */
+    /** Opens after the first load that brought data; the readiness probe relies on it. */
     private final CountDownLatch warmedUp = new CountDownLatch(1);
 
     public RefreshableReferenceCache(String name, Supplier<Map<K, V>> loader) {
@@ -76,6 +75,16 @@ public class RefreshableReferenceCache<K extends Comparable<K>, V> {
 
     public void refresh() {
         Map<K, V> fresh = loader.get();
+        if (fresh.isEmpty()) {
+            if (size() > 0) {
+                log.warn("Cache {} not replaced: the loader returned nothing, keeping {} entries",
+                        name, size());
+            } else {
+                log.warn("Cache {} is still empty after a load; readiness stays down", name);
+            }
+            return;
+        }
+
         lock.writeLock().lock();
         try {
             byKey.clear();
