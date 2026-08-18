@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="003-1-demo-customers" author="petstore" context="demo">
+        <comment>Three customers with fixed ids so order-service demo requests can name them.</comment>
+        <sql>
+            INSERT INTO customer (id, email, phone, first_name, last_name, status_id,
+                                  created_at, updated_at)
+            SELECT v.id::uuid, v.email, v.phone, v.first_name, v.last_name, s.id, now(), now()
+            FROM (VALUES
+                ('b0000000-0000-4000-8000-000000000001', 'ivan.petrov@example.com', '+79161234567',
+                 'Иван', 'Петров', 'ACTIVE'),
+                ('b0000000-0000-4000-8000-000000000002', 'maria.ivanova@example.com', '+79219876543',
+                 'Мария', 'Иванова', 'ACTIVE'),
+                ('b0000000-0000-4000-8000-000000000003', 'sergey.smirnov@example.com', '+79031112233',
+                 'Сергей', 'Смирнов', 'NEW')
+            ) AS v(id, email, phone, first_name, last_name, status_code)
+            JOIN customer_status s ON s.code = v.status_code;
+        </sql>
+        <rollback>
+            DELETE FROM customer WHERE id IN (
+                'b0000000-0000-4000-8000-000000000001',
+                'b0000000-0000-4000-8000-000000000002',
+                'b0000000-0000-4000-8000-000000000003');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="003-2-demo-addresses" author="petstore" context="demo">
+        <comment>
+            Ivan keeps two addresses: the default one and a second to ask for by id. The rows are
+            aged apart on purpose — now() is transaction time, identical for the whole statement,
+            and the successor of a deleted default is picked by created_at.
+        </comment>
+        <sql>
+            INSERT INTO address (id, customer_id, city_id, street, building, apartment, postal_code,
+                                 is_default, created_at, updated_at)
+            SELECT v.id::uuid, v.customer_id::uuid, c.id, v.street, v.building, v.apartment,
+                   v.postal_code, v.is_default,
+                   now() - v.age::interval, now() - v.age::interval
+            FROM (VALUES
+                ('c0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+                 'MSK', 'Дмитровское шоссе', '9к3', '154', '127434', true, '4 days'),
+                ('c0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001',
+                 'MSK', 'Ленинский проспект', '42', '7', '119071', false, '3 days'),
+                ('c0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000002',
+                 'SPB', 'Пулковское шоссе', '14', '203', '196158', true, '2 days'),
+                ('c0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000003',
+                 'EKB', 'Кольцовский тракт', '5', NULL, '620025', true, '1 day')
+            ) AS v(id, customer_id, city_code, street, building, apartment, postal_code,
+                   is_default, age)
+            JOIN city c ON c.code = v.city_code;
+        </sql>
+        <rollback>
+            DELETE FROM address WHERE customer_id IN (
+                'b0000000-0000-4000-8000-000000000001',
+                'b0000000-0000-4000-8000-000000000002',
+                'b0000000-0000-4000-8000-000000000003');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -7,17 +7,19 @@ spring:
   threads:
     virtual:
       enabled: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
-      show-details: always
-  metrics:
-    tags:
-      service: ${spring.application.name}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:petstore}
+    username: ${DB_USER:petstore}
+    password: ${DB_PASSWORD:petstore}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: customer
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: customer
+    contexts: ${LIQUIBASE_CONTEXTS:default}

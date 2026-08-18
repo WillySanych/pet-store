@@ -197,7 +197,6 @@ public class ReservationService {
                 reservation.getOrderId(), reservation.getStatus().getCode(), "reserved again");
     }
 
-    /** Sums the lines: a cart may list the same product twice, and both go into one hold. */
     private static Map<UUID, Integer> aggregate(List<ReserveLine> lines) {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("Reservation must have at least one item");

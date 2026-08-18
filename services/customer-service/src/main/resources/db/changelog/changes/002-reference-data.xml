@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-1-cities" author="petstore">
+        <sql>
+            INSERT INTO city (code, name) VALUES
+                ('MSK', 'Москва'),
+                ('SPB', 'Санкт-Петербург'),
+                ('EKB', 'Екатеринбург'),
+                ('NSK', 'Новосибирск'),
+                ('KZN', 'Казань'),
+                ('NN', 'Нижний Новгород');
+        </sql>
+        <rollback>
+            DELETE FROM city WHERE code IN ('MSK', 'SPB', 'EKB', 'NSK', 'KZN', 'NN');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-2-customer-statuses" author="petstore">
+        <comment>The codes here are the ones CustomerStatusCode branches on.</comment>
+        <sql>
+            INSERT INTO customer_status (code, name) VALUES
+                ('NEW', 'Новый'),
+                ('ACTIVE', 'Активный'),
+                ('BLOCKED', 'Заблокирован');
+        </sql>
+        <rollback>
+            DELETE FROM customer_status WHERE code IN ('NEW', 'ACTIVE', 'BLOCKED');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
