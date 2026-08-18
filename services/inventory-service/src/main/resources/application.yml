@@ -7,17 +7,43 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:petstore}
+    username: ${DB_USER:petstore}
+    password: ${DB_PASSWORD:petstore}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: inventory
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: inventory
+    contexts: ${LIQUIBASE_CONTEXTS:default}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: inventory-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      missing-topics-fatal: false
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
-      show-details: always
-  metrics:
-    tags:
-      service: ${spring.application.name}
+grpc:
+  server:
+    port: 9102
+
+petstore:
+  scheduler:
+    table-name: inventory.shedlock
+  inventory:
+    reservation-ttl: PT15M
+    expiry-scan-interval: PT1M
+    order-events-topic: order-events

@@ -28,7 +28,7 @@ import ru.petstore.catalog.web.dto.ReferenceResponse;
 class CatalogApiTest extends AbstractPostgresTest {
 
     @Autowired
-    private TestRestTemplate rest;
+    private TestRestTemplate testRestTemplate;
 
     private static ProductRequest request(String sku, String name,
                                           String categoryCode, String speciesCode) {
@@ -37,21 +37,21 @@ class CatalogApiTest extends AbstractPostgresTest {
     }
 
     private ProductResponse create(ProductRequest request) {
-        var response = rest.postForEntity("/api/v1/products", request, ProductResponse.class);
+        var response = testRestTemplate.postForEntity("/api/v1/products", request, ProductResponse.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getHeaders().getLocation()).isNotNull();
         return response.getBody();
     }
 
     private ProductResponse put(UUID id, ProductRequest request) {
-        var response = rest.exchange("/api/v1/products/" + id, HttpMethod.PUT,
+        var response = testRestTemplate.exchange("/api/v1/products/" + id, HttpMethod.PUT,
                 new HttpEntity<>(request), ProductResponse.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return response.getBody();
     }
 
     private PageResponse<ProductResponse> list(String query) {
-        return rest.exchange("/api/v1/products" + query, HttpMethod.GET, null,
+        return testRestTemplate.exchange("/api/v1/products" + query, HttpMethod.GET, null,
                 new ParameterizedTypeReference<PageResponse<ProductResponse>>() {
                 }).getBody();
     }
@@ -59,7 +59,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Справочники отдаются из кеша отсортированными по коду")
     void referenceTablesAreServedFromCache() {
-        var categories = rest.exchange("/api/v1/categories", HttpMethod.GET, null,
+        var categories = testRestTemplate.exchange("/api/v1/categories", HttpMethod.GET, null,
                 new ParameterizedTypeReference<java.util.List<ReferenceResponse>>() {
                 }).getBody();
 
@@ -70,7 +70,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Справочник не отдаёт наружу внутренний идентификатор")
     void referenceTablesDoNotExposeInternalIds() {
-        var categories = rest.getForObject("/api/v1/categories", JsonNode.class);
+        var categories = testRestTemplate.getForObject("/api/v1/categories", JsonNode.class);
 
         assertThat(categories.get(0).has("id")).isFalse();
         assertThat(categories.get(0).get("code").asText()).isNotBlank();
@@ -81,7 +81,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     void createdProductIsReadableById() {
         var created = create(request("SKU-" + UUID.randomUUID(), "Новый корм", "FOOD", "DOG"));
 
-        var found = rest.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
+        var found = testRestTemplate.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
 
         assertThat(found.id()).isEqualTo(created.id());
         assertThat(found.price()).isEqualByComparingTo("1234.50");
@@ -119,7 +119,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Неизвестный код справочника — 400 в общем формате")
     void unknownReferenceCodeReturns400() {
-        var response = rest.getForEntity("/api/v1/products?category=NOPE", JsonNode.class);
+        var response = testRestTemplate.getForEntity("/api/v1/products?category=NOPE", JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
@@ -129,7 +129,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Фильтры описаны в OpenAPI по одному параметру, а не вложенным объектом")
     void filtersAreDocumentedAsSeparateParameters() {
-        var parameters = rest.getForObject("/v3/api-docs", JsonNode.class)
+        var parameters = testRestTemplate.getForObject("/v3/api-docs", JsonNode.class)
                 .at("/paths/~1api~1v1~1products/get/parameters");
 
         assertThat(parameters).extracting(parameter -> parameter.get("name").asText())
@@ -139,7 +139,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Нечитаемое значение фильтра — 400 в общем формате")
     void malformedFilterValueReturns400() {
-        var response = rest.getForEntity("/api/v1/products?active=maybe", JsonNode.class);
+        var response = testRestTemplate.getForEntity("/api/v1/products?active=maybe", JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("VALIDATION_FAILED");
@@ -149,7 +149,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Отсутствующий товар — 404 в общем формате")
     void missingProductReturns404() {
-        var response = rest.getForEntity("/api/v1/products/" + UUID.randomUUID(), JsonNode.class);
+        var response = testRestTemplate.getForEntity("/api/v1/products/" + UUID.randomUUID(), JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody().get("code").asText()).isEqualTo("NOT_FOUND");
@@ -160,7 +160,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     void invalidBodyReturns400WithFieldList() {
         var invalid = new ProductRequest("", "", null, null, "FOOD", "DOG", "TRIXIE", null);
 
-        var response = rest.postForEntity("/api/v1/products", invalid, JsonNode.class);
+        var response = testRestTemplate.postForEntity("/api/v1/products", invalid, JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("VALIDATION_FAILED");
@@ -173,7 +173,7 @@ class CatalogApiTest extends AbstractPostgresTest {
         var sku = "SKU-" + UUID.randomUUID();
         create(request(sku, "Первый", "FOOD", "CAT"));
 
-        var response = rest.postForEntity("/api/v1/products",
+        var response = testRestTemplate.postForEntity("/api/v1/products",
                 request(sku, "Второй", "TOYS", "CAT"), JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -189,7 +189,7 @@ class CatalogApiTest extends AbstractPostgresTest {
 
         put(created.id(), replacement);
 
-        var found = rest.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
+        var found = testRestTemplate.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
         assertThat(found.name()).isEqualTo("Стало");
         assertThat(found.price()).isEqualByComparingTo("999.99");
         assertThat(found.category().code()).isEqualTo("TOYS");
@@ -207,7 +207,7 @@ class CatalogApiTest extends AbstractPostgresTest {
         put(created.id(), new ProductRequest(sku, "Лампа для террариума",
                 null, created.price(), "ACCESSORIES", "REPTILE", "TRIXIE", null));
 
-        var found = rest.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
+        var found = testRestTemplate.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
         assertThat(found.name()).isEqualTo("Лампа для террариума");
         assertThat(found.active()).isFalse();
     }
@@ -215,7 +215,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Сортировка по неизвестному полю — 400, а не 500")
     void unknownSortPropertyReturns400() {
-        var response = rest.getForEntity("/api/v1/products?sort=foo", JsonNode.class);
+        var response = testRestTemplate.getForEntity("/api/v1/products?sort=foo", JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
@@ -225,7 +225,7 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Readiness поднимается только с прогретыми кешами")
     void readinessReportsWarmedUpCaches() {
-        var response = rest.getForEntity("/actuator/health/readiness", JsonNode.class);
+        var response = testRestTemplate.getForEntity("/actuator/health/readiness", JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("status").asText()).isEqualTo("UP");
@@ -234,9 +234,9 @@ class CatalogApiTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Размеры кешей каталога уезжают в Prometheus")
     void cacheMetricsAreExported() {
-        rest.getForObject("/api/v1/categories", String.class);
+        testRestTemplate.getForObject("/api/v1/categories", String.class);
 
-        var metrics = rest.getForObject("/actuator/prometheus", String.class);
+        var metrics = testRestTemplate.getForObject("/actuator/prometheus", String.class);
 
         assertThat(metrics)
                 .contains("petstore_cache_size")

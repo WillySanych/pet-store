@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.petstore.catalog.service.ProductService;
-import ru.petstore.common.overload.OverloadProtection;
 import ru.petstore.catalog.web.dto.PageResponse;
 import ru.petstore.catalog.web.dto.ProductFilterRequest;
 import ru.petstore.catalog.web.dto.ProductRequest;
@@ -28,15 +27,10 @@ import ru.petstore.catalog.web.dto.ProductResponse;
 @Tag(name = "Товары")
 public class ProductController {
 
-    /** The metric label: the path template, never the actual URI. */
-    private static final String LIST_ENDPOINT = "GET /api/v1/products";
-
     private final ProductService productService;
-    private final OverloadProtection overloadProtection;
 
-    public ProductController(ProductService productService, OverloadProtection overloadProtection) {
+    public ProductController(ProductService productService) {
         this.productService = productService;
-        this.overloadProtection = overloadProtection;
     }
 
     @GetMapping
@@ -44,7 +38,7 @@ public class ProductController {
     public PageResponse<ProductResponse> list(
             @ParameterObject ProductFilterRequest filter,
             @ParameterObject @PageableDefault(sort = "name") Pageable pageable) {
-        return overloadProtection.call(LIST_ENDPOINT, () -> productService.search(filter, pageable));
+        return productService.search(filter, pageable);
     }
 
     @GetMapping("/{id}")

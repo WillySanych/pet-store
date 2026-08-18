@@ -1,5 +1,6 @@
 package ru.petstore.common.web;
 
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,14 +15,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import ru.petstore.common.metrics.ServiceMetrics;
-import ru.petstore.common.overload.OverloadedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** Seconds before retrying a 503. */
+    /** Seconds before retrying a rejected request. */
     private static final String RETRY_AFTER_SECONDS = "5";
 
     private final ServiceMetrics serviceMetrics;
@@ -30,11 +30,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         this.serviceMetrics = serviceMetrics;
     }
 
-    @ExceptionHandler(OverloadedException.class)
-    public ResponseEntity<ApiErrorResponse> handleOverloaded(OverloadedException e) {
+    @ExceptionHandler(BulkheadFullException.class)
+    public ResponseEntity<ApiErrorResponse> handleOverloaded(BulkheadFullException e) {
         serviceMetrics.recordError("overloaded");
-        log.warn("Request rejected due to overload: {}", e.endpoint());
-        return body(HttpStatus.TOO_MANY_REQUESTS, "OVERLOADED", e.getMessage());
+        log.warn("Request rejected due to overload: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+                .body(ApiErrorResponse.of("OVERLOADED", "Service is busy, retry later", requestId()));
+    }
+
+    @ExceptionHandler(ConcurrentChangeException.class)
+    public ResponseEntity<ApiErrorResponse> handleConcurrentChange(ConcurrentChangeException e) {
+        serviceMetrics.recordError("concurrent_change");
+        log.warn("Request lost a race: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+                .body(ApiErrorResponse.of("CONCURRENT_CHANGE", e.getMessage(), requestId()));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

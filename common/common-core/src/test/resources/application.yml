@@ -1,0 +1,5 @@
+# Базы у common-core нет, а spring-jdbc из ShedLock включает DataSourceAutoConfiguration —
+# без этой строки тестовые контексты падают на отсутствии базы данных.
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration

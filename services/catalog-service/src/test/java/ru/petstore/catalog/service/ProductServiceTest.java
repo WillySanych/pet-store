@@ -31,7 +31,6 @@ import org.springframework.data.jpa.domain.Specification;
 import ru.petstore.catalog.domain.Brand;
 import ru.petstore.catalog.domain.Category;
 import ru.petstore.catalog.domain.Product;
-import ru.petstore.catalog.domain.ReferenceEntity;
 import ru.petstore.catalog.domain.Species;
 import ru.petstore.catalog.repository.BrandRepository;
 import ru.petstore.catalog.repository.CategoryRepository;
@@ -39,6 +38,9 @@ import ru.petstore.catalog.repository.ProductRepository;
 import ru.petstore.catalog.repository.SpeciesRepository;
 import ru.petstore.catalog.web.dto.ProductFilterRequest;
 import ru.petstore.catalog.web.dto.ProductRequest;
+import ru.petstore.common.reference.ReferenceDataService;
+import ru.petstore.common.reference.ReferenceEntity;
+import ru.petstore.common.reference.ReferenceItem;
 import ru.petstore.common.web.ResourceNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,18 +48,18 @@ import ru.petstore.common.web.ResourceNotFoundException;
 class ProductServiceTest {
 
     @Mock
-    private ProductRepository products;
+    private ProductRepository productRepository;
     @Mock
-    private CategoryRepository categories;
+    private CategoryRepository categoryRepository;
     @Mock
-    private SpeciesRepository species;
+    private SpeciesRepository speciesRepository;
     @Mock
-    private BrandRepository brands;
+    private BrandRepository brandRepository;
     @Mock
-    private ReferenceDataService references;
+    private ReferenceDataService referenceDataService;
 
     @InjectMocks
-    private ProductService service;
+    private ProductService productService;
 
     private static final ProductFilterRequest NO_FILTER =
             new ProductFilterRequest(null, null, null, null);
@@ -96,12 +98,12 @@ class ProductServiceTest {
     }
 
     private void referencesResolve() {
-        when(references.getRequired(ReferenceType.CATEGORY, "FOOD")).thenReturn(FOOD);
-        when(references.getRequired(ReferenceType.SPECIES, "DOG")).thenReturn(DOG);
-        when(references.getRequired(ReferenceType.BRAND, "TRIXIE")).thenReturn(TRIXIE);
-        when(categories.getReferenceById(FOOD.id())).thenReturn(new Category());
-        when(species.getReferenceById(DOG.id())).thenReturn(new Species());
-        when(brands.getReferenceById(TRIXIE.id())).thenReturn(new Brand());
+        when(referenceDataService.getRequired(ReferenceType.CATEGORY, "FOOD")).thenReturn(FOOD);
+        when(referenceDataService.getRequired(ReferenceType.SPECIES, "DOG")).thenReturn(DOG);
+        when(referenceDataService.getRequired(ReferenceType.BRAND, "TRIXIE")).thenReturn(TRIXIE);
+        when(categoryRepository.getReferenceById(FOOD.id())).thenReturn(new Category());
+        when(speciesRepository.getReferenceById(DOG.id())).thenReturn(new Species());
+        when(brandRepository.getReferenceById(TRIXIE.id())).thenReturn(new Brand());
     }
 
     private static DataIntegrityViolationException violation(String cause) {
@@ -113,10 +115,10 @@ class ProductServiceTest {
     @DisplayName("Пустой фильтр не мешает выдаче и отдаёт метаданные страницы")
     void emptyFilterReturnsPageMetadata() {
         var pageable = PageRequest.of(1, 2);
-        when(products.findAll(any(Specification.class), any(Pageable.class)))
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(product(UUID.randomUUID(), "SKU-1")), pageable, 7));
 
-        var page = service.search(NO_FILTER, pageable);
+        var page = productService.search(NO_FILTER, pageable);
 
         assertThat(page.content()).hasSize(1);
         assertThat(page.page()).isEqualTo(1);
@@ -128,44 +130,44 @@ class ProductServiceTest {
     @Test
     @DisplayName("Неизвестный код в фильтре не доходит до базы")
     void unknownFilterCodeNeverReachesDatabase() {
-        when(references.getIdOrNull(ReferenceType.CATEGORY, "NOPE"))
+        when(referenceDataService.getIdOrNull(ReferenceType.CATEGORY, "NOPE"))
                 .thenThrow(new IllegalArgumentException("Unknown category code: NOPE"));
 
-        assertThatThrownBy(() -> service.search(
+        assertThatThrownBy(() -> productService.search(
                 new ProductFilterRequest("NOPE", null, null, null), PageRequest.of(0, 20)))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(products, never()).findAll(any(Specification.class), any(Pageable.class));
+        verify(productRepository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
     @DisplayName("Сортировка по неизвестному полю — ошибка клиента, а не 500 из недр Spring Data")
     void unknownSortPropertyIsRejected() {
-        assertThatThrownBy(() -> service.search(
+        assertThatThrownBy(() -> productService.search(
                 NO_FILTER, PageRequest.of(0, 20, Sort.by("foo"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("foo");
 
-        verify(products, never()).findAll(any(Specification.class), any(Pageable.class));
+        verify(productRepository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
     @DisplayName("Сортировка по разрешённому полю проходит")
     void allowedSortPropertyPassesThrough() {
         var pageable = PageRequest.of(0, 20, Sort.by("price").descending());
-        when(products.findAll(any(Specification.class), any(Pageable.class)))
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        assertThat(service.search(NO_FILTER, pageable).content()).isEmpty();
+        assertThat(productService.search(NO_FILTER, pageable).content()).isEmpty();
     }
 
     @Test
     @DisplayName("Отсутствующий товар — 404, а не пустой ответ")
     void missingProductIsNotFound() {
         UUID id = UUID.randomUUID();
-        when(products.findById(id)).thenReturn(Optional.empty());
+        when(productRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.get(id))
+        assertThatThrownBy(() -> productService.get(id))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(id.toString());
     }
@@ -174,29 +176,29 @@ class ProductServiceTest {
     @DisplayName("Создание переносит поля запроса и резолвит справочники по кодам")
     void createCopiesRequestAndResolvesReferences() {
         referencesResolve();
-        when(products.existsBySku("SKU-NEW")).thenReturn(false);
-        when(products.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(productRepository.existsBySku("SKU-NEW")).thenReturn(false);
+        when(productRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        service.create(request("SKU-NEW"));
+        productService.create(request("SKU-NEW"));
 
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
-        verify(products).saveAndFlush(saved.capture());
+        verify(productRepository).saveAndFlush(saved.capture());
         assertThat(saved.getValue().getSku()).isEqualTo("SKU-NEW");
         assertThat(saved.getValue().getPrice()).isEqualByComparingTo("2499.00");
         assertThat(saved.getValue().isActive()).isTrue();
-        verify(categories).getReferenceById(FOOD.id());
-        verify(species).getReferenceById(DOG.id());
-        verify(brands).getReferenceById(TRIXIE.id());
+        verify(categoryRepository).getReferenceById(FOOD.id());
+        verify(speciesRepository).getReferenceById(DOG.id());
+        verify(brandRepository).getReferenceById(TRIXIE.id());
     }
 
     @Test
     @DisplayName("Ответ на запись собирается из кеша, а не из ленивых прокси")
     void writeResponseIsBuiltFromCache() {
         referencesResolve();
-        when(products.existsBySku("SKU-NEW")).thenReturn(false);
-        when(products.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(productRepository.existsBySku("SKU-NEW")).thenReturn(false);
+        when(productRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        var created = service.create(request("SKU-NEW"));
+        var created = productService.create(request("SKU-NEW"));
 
         assertThat(created.category().code()).isEqualTo("FOOD");
         assertThat(created.species().name()).isEqualTo("Собаки");
@@ -206,24 +208,24 @@ class ProductServiceTest {
     @Test
     @DisplayName("Повторный sku отклоняется до сохранения")
     void duplicateSkuIsRejectedBeforeSave() {
-        when(products.existsBySku("SKU-TAKEN")).thenReturn(true);
+        when(productRepository.existsBySku("SKU-TAKEN")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(request("SKU-TAKEN")))
+        assertThatThrownBy(() -> productService.create(request("SKU-TAKEN")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SKU-TAKEN");
 
-        verify(products, never()).saveAndFlush(any());
+        verify(productRepository, never()).saveAndFlush(any());
     }
 
     @Test
     @DisplayName("Гонка на sku: нарушение уникального индекса тоже ошибка клиента")
     void uniqueIndexViolationIsReportedAsClientError() {
         referencesResolve();
-        when(products.existsBySku("SKU-RACE")).thenReturn(false);
-        when(products.saveAndFlush(any())).thenThrow(violation(
+        when(productRepository.existsBySku("SKU-RACE")).thenReturn(false);
+        when(productRepository.saveAndFlush(any())).thenThrow(violation(
                 "duplicate key value violates unique constraint \"uq_product_sku\""));
 
-        assertThatThrownBy(() -> service.create(request("SKU-RACE")))
+        assertThatThrownBy(() -> productService.create(request("SKU-RACE")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SKU-RACE");
     }
@@ -232,11 +234,11 @@ class ProductServiceTest {
     @DisplayName("Чужое нарушение целостности не выдаётся за занятый sku")
     void otherIntegrityViolationIsNotDisguised() {
         referencesResolve();
-        when(products.existsBySku("SKU-NEW")).thenReturn(false);
-        when(products.saveAndFlush(any()))
+        when(productRepository.existsBySku("SKU-NEW")).thenReturn(false);
+        when(productRepository.saveAndFlush(any()))
                 .thenThrow(violation("insert violates foreign key constraint \"fk_product_brand\""));
 
-        assertThatThrownBy(() -> service.create(request("SKU-NEW")))
+        assertThatThrownBy(() -> productService.create(request("SKU-NEW")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -246,14 +248,14 @@ class ProductServiceTest {
         UUID id = UUID.randomUUID();
         Product existing = product(id, "SKU-1");
         referencesResolve();
-        when(products.findById(id)).thenReturn(Optional.of(existing));
-        when(products.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(productRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        var updated = service.update(id, request("SKU-1"));
+        var updated = productService.update(id, request("SKU-1"));
 
         assertThat(updated.sku()).isEqualTo("SKU-1");
-        verify(products).saveAndFlush(existing);
-        verify(products, never()).existsBySku(any());
+        verify(productRepository).saveAndFlush(existing);
+        verify(productRepository, never()).existsBySku(any());
     }
 
     @Test
@@ -263,10 +265,10 @@ class ProductServiceTest {
         Product withdrawn = product(id, "SKU-1");
         withdrawn.setActive(false);
         referencesResolve();
-        when(products.findById(id)).thenReturn(Optional.of(withdrawn));
-        when(products.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(productRepository.findById(id)).thenReturn(Optional.of(withdrawn));
+        when(productRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        var updated = service.update(id, request("SKU-1"));
+        var updated = productService.update(id, request("SKU-1"));
 
         assertThat(updated.active()).isFalse();
         assertThat(withdrawn.isActive()).isFalse();
@@ -279,42 +281,42 @@ class ProductServiceTest {
         Product withdrawn = product(id, "SKU-1");
         withdrawn.setActive(false);
         referencesResolve();
-        when(products.findById(id)).thenReturn(Optional.of(withdrawn));
-        when(products.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(productRepository.findById(id)).thenReturn(Optional.of(withdrawn));
+        when(productRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        assertThat(service.update(id, request("SKU-1", true)).active()).isTrue();
+        assertThat(productService.update(id, request("SKU-1", true)).active()).isTrue();
     }
 
     @Test
     @DisplayName("Обновление на чужой sku отклоняется")
     void updateRejectsSkuTakenByAnotherProduct() {
         UUID id = UUID.randomUUID();
-        when(products.findById(id)).thenReturn(Optional.of(product(id, "SKU-1")));
-        when(products.existsBySku("SKU-2")).thenReturn(true);
+        when(productRepository.findById(id)).thenReturn(Optional.of(product(id, "SKU-1")));
+        when(productRepository.existsBySku("SKU-2")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.update(id, request("SKU-2")))
+        assertThatThrownBy(() -> productService.update(id, request("SKU-2")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SKU-2");
 
-        verify(products, never()).saveAndFlush(any());
+        verify(productRepository, never()).saveAndFlush(any());
     }
 
     @Test
     @DisplayName("gRPC-выдача не ходит в базу за пустым списком идентификаторов")
     void emptyIdListSkipsDatabase() {
-        assertThat(service.getProductSummaries(List.of())).isEmpty();
+        assertThat(productService.getProductSummaries(List.of())).isEmpty();
 
-        verify(products, never()).findAllByIdIn(any());
+        verify(productRepository, never()).findAllByIdIn(any());
     }
 
     @Test
     @DisplayName("gRPC-выдача отдаёт цену и признак активности")
     void summariesCarryPriceAndActiveFlag() {
         UUID id = UUID.randomUUID();
-        when(products.findAllByIdIn(List.of(id))).thenReturn(
+        when(productRepository.findAllByIdIn(List.of(id))).thenReturn(
                 List.of(new ProductSummary(id, "Корм", new BigDecimal("2499.00"), true)));
 
-        assertThat(service.getProductSummaries(List.of(id)))
+        assertThat(productService.getProductSummaries(List.of(id)))
                 .singleElement()
                 .satisfies(summary -> {
                     assertThat(summary.id()).isEqualTo(id);

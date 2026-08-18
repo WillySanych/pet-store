@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="004-1-demo-stock" author="petstore" context="demo">
+        <comment>
+            Stock for the twelve demo products of catalog-service — the same fixed identifiers, so
+            LIQUIBASE_CONTEXTS=demo in both services gives a catalogue that can actually be ordered.
+            The last two are deliberate edge cases: nothing left, and one single item.
+        </comment>
+        <sql>
+            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved, version,
+                                    created_at, updated_at)
+            SELECT gen_random_uuid(), v.product_id::uuid, w.id, v.quantity, 0, 0, now(), now()
+            FROM (VALUES
+                ('a0000000-0000-4000-8000-000000000001', 40, 'MSK'),
+                ('a0000000-0000-4000-8000-000000000002', 35, 'MSK'),
+                ('a0000000-0000-4000-8000-000000000003', 18, 'SPB'),
+                ('a0000000-0000-4000-8000-000000000004', 22, 'SPB'),
+                ('a0000000-0000-4000-8000-000000000005', 120, 'MSK'),
+                ('a0000000-0000-4000-8000-000000000006', 150, 'MSK'),
+                ('a0000000-0000-4000-8000-000000000007', 7, 'EKB'),
+                ('a0000000-0000-4000-8000-000000000008', 12, 'EKB'),
+                ('a0000000-0000-4000-8000-000000000009', 60, 'SPB'),
+                ('a0000000-0000-4000-8000-000000000010', 45, 'MSK'),
+                ('a0000000-0000-4000-8000-000000000011', 0, 'EKB'),
+                ('a0000000-0000-4000-8000-000000000012', 1, 'EKB')
+            ) AS v (product_id, quantity, warehouse_code)
+            JOIN warehouse w ON w.code = v.warehouse_code;
+        </sql>
+        <rollback>
+            DELETE FROM stock_item WHERE product_id IN (
+                'a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002',
+                'a0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000004',
+                'a0000000-0000-4000-8000-000000000005', 'a0000000-0000-4000-8000-000000000006',
+                'a0000000-0000-4000-8000-000000000007', 'a0000000-0000-4000-8000-000000000008',
+                'a0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-000000000010',
+                'a0000000-0000-4000-8000-000000000011', 'a0000000-0000-4000-8000-000000000012');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -13,8 +13,9 @@
 | `order-service`        | 8084            | `orders`       |
 | `subscription-service` | 8085            | `subscription` |
 
-Общие модули: `common/common-core` (кеши, метрики, сквозное логирование, защита от перегрузки),
-`common/common-proto` (контракты gRPC). Бенчмарки JMH — в `benchmarks/`.
+Общие модули: `common/common-core` (кеши, справочники, метрики, сквозное логирование, защита
+от перегрузки, блокировка планировщиков), `common/common-proto` (контракты gRPC).
+Бенчмарки JMH — в `benchmarks/`.
 
 ## Требования
 
@@ -64,3 +65,19 @@ mvn -pl services/catalog-service spring-boot:run
 
 Двенадцать демо-товаров лежат под контекстом `demo` и по умолчанию **не** добавляются —
 скрипт на их добавление находится в отдельном контексте: `LIQUIBASE_CONTEXTS=demo`.
+
+### `inventory-service`
+
+```bash
+mvn -pl services/inventory-service spring-boot:run
+```
+
+Остатки и резервы: REST на 8082, gRPC-сервер `Reserve`/`Release` на 9102, потребитель Kafka
+топика `order-events`. Таблицы схемы `inventory` и справочники (`warehouse`, `reservation_status`)
+заводит Liquibase при старте, поэтому инфраструктура из `docker-compose` должна быть поднята.
+
+Демо-остатки на те же двенадцать товаров каталога — тоже под контекстом `demo`:
+`LIQUIBASE_CONTEXTS=demo` в обоих сервисах даёт каталог, который можно заказать.
+
+Остаток списывается **только** по событию `ORDER_CONFIRMED` из Kafka. Топик `order-events` заводит
+его продюсер, `order-service`.

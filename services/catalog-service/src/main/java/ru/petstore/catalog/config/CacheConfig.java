@@ -1,15 +1,16 @@
 package ru.petstore.catalog.config;
 
-import java.util.stream.Collectors;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.jpa.repository.JpaRepository;
-import ru.petstore.catalog.domain.ReferenceEntity;
 import ru.petstore.catalog.repository.BrandRepository;
 import ru.petstore.catalog.repository.CategoryRepository;
 import ru.petstore.catalog.repository.SpeciesRepository;
-import ru.petstore.catalog.service.ReferenceItem;
+import ru.petstore.catalog.service.ReferenceType;
 import ru.petstore.common.cache.RefreshableReferenceCache;
+import ru.petstore.common.reference.ReferenceCaches;
+import ru.petstore.common.reference.ReferenceDataService;
+import ru.petstore.common.reference.ReferenceItem;
 
 /**
  * The three reference caches of this service. {@code ReferenceCacheRegistry} from
@@ -20,24 +21,22 @@ public class CacheConfig {
 
     @Bean
     public RefreshableReferenceCache<String, ReferenceItem> categoryCache(CategoryRepository repository) {
-        return referenceCache("categories", repository);
+        return ReferenceCaches.of("categories", repository::findAll);
     }
 
     @Bean
     public RefreshableReferenceCache<String, ReferenceItem> speciesCache(SpeciesRepository repository) {
-        return referenceCache("species", repository);
+        return ReferenceCaches.of("species", repository::findAll);
     }
 
     @Bean
     public RefreshableReferenceCache<String, ReferenceItem> brandCache(BrandRepository repository) {
-        return referenceCache("brands", repository);
+        return ReferenceCaches.of("brands", repository::findAll);
     }
 
-    private static RefreshableReferenceCache<String, ReferenceItem> referenceCache(
-            String name, JpaRepository<? extends ReferenceEntity, Long> repository) {
-        return new RefreshableReferenceCache<>(name, () -> repository.findAll().stream()
-                .collect(Collectors.toMap(
-                        ReferenceEntity::getCode,
-                        entity -> new ReferenceItem(entity.getId(), entity.getCode(), entity.getName()))));
+    @Bean
+    public ReferenceDataService referenceDataService(
+            Map<String, RefreshableReferenceCache<String, ReferenceItem>> caches) {
+        return new ReferenceDataService(ReferenceType.values(), caches);
     }
 }

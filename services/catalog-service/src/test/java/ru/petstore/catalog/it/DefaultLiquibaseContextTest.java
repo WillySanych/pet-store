@@ -12,15 +12,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class DefaultLiquibaseContextTest extends AbstractPostgresTest {
 
     @Autowired
-    private JdbcTemplate jdbc;
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("По умолчанию демо-товары не заводятся: контекст demo надо запросить явно")
     void demoGoodsAreNotSeededByDefault() {
-        Long demoApplied = jdbc.queryForObject(
+        Long demoApplied = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM catalog.databasechangelog WHERE id = '003-1-demo-products'",
                 Long.class);
-        Long schemaApplied = jdbc.queryForObject(
+        Long schemaApplied = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM catalog.databasechangelog WHERE id = '001-1-category'",
                 Long.class);
 

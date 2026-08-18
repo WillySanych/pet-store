@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import ru.petstore.common.metrics.ServiceMetrics;
-import ru.petstore.common.overload.OverloadedException;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 
 class GlobalExceptionHandlerTest {
 
@@ -40,7 +41,7 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/overloaded")
         String overloaded() {
-            throw new OverloadedException("/overloaded");
+            throw BulkheadFullException.createBulkheadFullException(Bulkhead.ofDefaults("overload"));
         }
 
         @GetMapping("/boom")
@@ -62,6 +63,12 @@ class GlobalExceptionHandlerTest {
         String notReady() {
             throw new ServiceUnavailableException("Reference data category is not loaded yet");
         }
+
+        @GetMapping("/raced")
+        String raced() {
+            throw new ConcurrentChangeException("Stock for product 42 changed concurrently",
+                    new IllegalStateException("version mismatch"));
+        }
     }
 
     private final MockMvc mockMvc = MockMvcBuilders
@@ -75,6 +82,15 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/overloaded"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("OVERLOADED"));
+    }
+
+    @Test
+    @DisplayName("Проигранная гонка отдаёт 409 с Retry-After, а не 500")
+    void concurrentChangeReturns409() throws Exception {
+        mockMvc.perform(get("/raced"))
+                .andExpect(status().isConflict())
+                .andExpect(header().string("Retry-After", "5"))
+                .andExpect(jsonPath("$.code").value("CONCURRENT_CHANGE"));
     }
 
     @Test

@@ -7,11 +7,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +27,6 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import ru.petstore.catalog.service.ProductService;
 import ru.petstore.catalog.service.ProductSummary;
 import ru.petstore.common.metrics.ServiceMetrics;
-import ru.petstore.common.overload.OverloadProtection;
 import ru.petstore.proto.catalog.GetProductsRequest;
 import ru.petstore.proto.catalog.GetProductsResponse;
 
@@ -32,18 +34,32 @@ import ru.petstore.proto.catalog.GetProductsResponse;
 class CatalogGrpcServiceTest {
 
     @Mock
-    private ProductService products;
+    private ProductService productService;
 
     @Mock
     private StreamObserver<GetProductsResponse> observer;
 
     private CatalogGrpcService service() {
-        return service(64);
+        return service(bulkhead(64));
     }
 
-    private CatalogGrpcService service(int maxConcurrent) {
-        return new CatalogGrpcService(products,
-                new OverloadProtection(maxConcurrent, new ServiceMetrics(new SimpleMeterRegistry())));
+    /** A bulkhead whose only permit is already taken, so the next call is rejected. */
+    private CatalogGrpcService serviceWithFullBulkhead() {
+        Bulkhead full = bulkhead(1);
+        full.acquirePermission();
+        return service(full);
+    }
+
+    private CatalogGrpcService service(Bulkhead overloadBulkhead) {
+        return new CatalogGrpcService(productService, overloadBulkhead,
+                new ServiceMetrics(new SimpleMeterRegistry()));
+    }
+
+    private static Bulkhead bulkhead(int maxConcurrent) {
+        return Bulkhead.of("test", BulkheadConfig.custom()
+                .maxConcurrentCalls(maxConcurrent)
+                .maxWaitDuration(Duration.ZERO)
+                .build());
     }
 
     private Status.Code errorCode() {
@@ -64,7 +80,7 @@ class CatalogGrpcServiceTest {
     @DisplayName("Цена уезжает строкой без потери копеек")
     void priceIsSentAsStringWithoutLosingCents() {
         UUID id = UUID.randomUUID();
-        when(products.getProductSummaries(List.of(id)))
+        when(productService.getProductSummaries(List.of(id)))
                 .thenReturn(List.of(new ProductSummary(id, "Корм", new BigDecimal("2499.90"), true)));
 
         service().getProducts(
@@ -84,7 +100,7 @@ class CatalogGrpcServiceTest {
     void missingProductIsOmittedFromResponse() {
         UUID found = UUID.randomUUID();
         UUID missing = UUID.randomUUID();
-        when(products.getProductSummaries(List.of(found, missing)))
+        when(productService.getProductSummaries(List.of(found, missing)))
                 .thenReturn(List.of(new ProductSummary(found, "Корм", new BigDecimal("10.00"), true)));
 
         service().getProducts(GetProductsRequest.newBuilder()
@@ -108,13 +124,13 @@ class CatalogGrpcServiceTest {
                 e -> assertThat(e.getStatus().getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT));
 
         verify(observer, never()).onNext(any());
-        verifyNoInteractions(products);
+        verifyNoInteractions(productService);
     }
 
     @Test
     @DisplayName("Пустой запрос отдаёт пустой ответ, а не ошибку")
     void emptyRequestReturnsEmptyResponse() {
-        when(products.getProductSummaries(List.of())).thenReturn(List.of());
+        when(productService.getProductSummaries(List.of())).thenReturn(List.of());
 
         service().getProducts(GetProductsRequest.newBuilder().build(), observer);
 
@@ -125,7 +141,7 @@ class CatalogGrpcServiceTest {
     @DisplayName("Один и тот же id дважды — один запрос и один товар в ответе")
     void duplicateIdsAreCollapsedBeforeTheQuery() {
         UUID id = UUID.randomUUID();
-        when(products.getProductSummaries(List.of(id)))
+        when(productService.getProductSummaries(List.of(id)))
                 .thenReturn(List.of(new ProductSummary(id, "Корм", new BigDecimal("10.00"), true)));
 
         service().getProducts(GetProductsRequest.newBuilder()
@@ -134,14 +150,14 @@ class CatalogGrpcServiceTest {
                 .build(), observer);
 
         assertThat(capturedResponse().getProductsList()).hasSize(1);
-        verify(products).getProductSummaries(List.of(id));
+        verify(productService).getProductSummaries(List.of(id));
         verify(observer, never()).onError(any());
     }
 
     @Test
     @DisplayName("Недоступная БД — UNAVAILABLE, а не UNKNOWN из глубины драйвера")
     void databaseFailureIsReportedAsUnavailable() {
-        when(products.getProductSummaries(any()))
+        when(productService.getProductSummaries(any()))
                 .thenThrow(new DataAccessResourceFailureException("pool exhausted"));
 
         service().getProducts(GetProductsRequest.newBuilder()
@@ -154,7 +170,7 @@ class CatalogGrpcServiceTest {
     @Test
     @DisplayName("Прочая ошибка сервиса — INTERNAL без утечки стектрейса наружу")
     void unexpectedFailureIsReportedAsInternal() {
-        when(products.getProductSummaries(any())).thenThrow(new IllegalStateException("boom"));
+        when(productService.getProductSummaries(any())).thenThrow(new IllegalStateException("boom"));
 
         service().getProducts(GetProductsRequest.newBuilder()
                 .addProductIds(UUID.randomUUID().toString()).build(), observer);
@@ -166,11 +182,11 @@ class CatalogGrpcServiceTest {
     @Test
     @DisplayName("Исчерпанный bulkhead — RESOURCE_EXHAUSTED, аналог 429 по HTTP")
     void overloadIsReportedAsResourceExhausted() {
-        service(0).getProducts(GetProductsRequest.newBuilder()
+        serviceWithFullBulkhead().getProducts(GetProductsRequest.newBuilder()
                 .addProductIds(UUID.randomUUID().toString()).build(), observer);
 
         assertThat(errorCode()).isEqualTo(Status.Code.RESOURCE_EXHAUSTED);
         verify(observer, never()).onNext(any());
-        verifyNoInteractions(products);
+        verifyNoInteractions(productService);
     }
 }

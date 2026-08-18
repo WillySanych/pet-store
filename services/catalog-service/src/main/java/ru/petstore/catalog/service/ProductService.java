@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.catalog.domain.Product;
 import ru.petstore.catalog.repository.*;
 import ru.petstore.catalog.web.dto.*;
+import ru.petstore.common.reference.ReferenceDataService;
+import ru.petstore.common.reference.ReferenceItem;
 import ru.petstore.common.web.ResourceNotFoundException;
 
 import java.util.*;

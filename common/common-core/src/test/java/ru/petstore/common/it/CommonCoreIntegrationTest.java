@@ -25,10 +25,10 @@ import ru.petstore.common.web.RequestTracingFilter;
 class CommonCoreIntegrationTest {
 
     @Autowired
-    private TestRestTemplate rest;
+    private TestRestTemplate testRestTemplate;
 
     @Autowired
-    private MeterRegistry registry;
+    private MeterRegistry meterRegistry;
 
     @Test
     @DisplayName("Входящий идентификатор возвращается в ответе")
@@ -37,7 +37,7 @@ class CommonCoreIntegrationTest {
         var headers = new HttpHeaders();
         headers.set(RequestTracingFilter.REQUEST_ID_HEADER, incoming);
 
-        var response = rest.exchange("/probe/42", HttpMethod.GET,
+        var response = testRestTemplate.exchange("/probe/42", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -48,7 +48,7 @@ class CommonCoreIntegrationTest {
     @Test
     @DisplayName("Без заголовка идентификатор генерируется сам")
     void requestIdIsGeneratedWhenHeaderAbsent() {
-        var response = rest.getForEntity("/probe/7", String.class);
+        var response = testRestTemplate.getForEntity("/probe/7", String.class);
 
         assertThat(response.getHeaders().getFirst(RequestTracingFilter.REQUEST_ID_HEADER))
                 .isNotBlank();
@@ -61,9 +61,9 @@ class CommonCoreIntegrationTest {
         // would depend on the order the tests run in
         double before = successCount("/probe/{id}");
 
-        rest.getForEntity("/probe/111", String.class);
-        rest.getForEntity("/probe/222", String.class);
-        rest.getForEntity("/probe/333", String.class);
+        testRestTemplate.getForEntity("/probe/111", String.class);
+        testRestTemplate.getForEntity("/probe/222", String.class);
+        testRestTemplate.getForEntity("/probe/333", String.class);
 
         assertThat(successCount("/probe/{id}") - before).isEqualTo(3);
 
@@ -73,9 +73,9 @@ class CommonCoreIntegrationTest {
     @Test
     @DisplayName("Длительность запроса попадает в Timer с тем же шаблоном")
     void requestDurationUsesSamePathTemplate() {
-        rest.getForEntity("/probe/9", String.class);
+        testRestTemplate.getForEntity("/probe/9", String.class);
 
-        var timer = registry.get(ServiceMetrics.REQUEST_DURATION)
+        var timer = meterRegistry.get(ServiceMetrics.REQUEST_DURATION)
                 .tag("endpoint", "/probe/{id}")
                 .timer();
 
@@ -89,7 +89,7 @@ class CommonCoreIntegrationTest {
         var headers = new HttpHeaders();
         headers.set(RequestTracingFilter.REQUEST_ID_HEADER, incoming);
 
-        var response = rest.exchange("/probe/boom", HttpMethod.GET,
+        var response = testRestTemplate.exchange("/probe/boom", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -101,9 +101,9 @@ class CommonCoreIntegrationTest {
     @Test
     @DisplayName("Неуспешный запрос считается отдельно от успешного")
     void failedRequestIsCountedSeparately() {
-        rest.getForEntity("/probe/boom", String.class);
+        testRestTemplate.getForEntity("/probe/boom", String.class);
 
-        var failures = registry.get(ServiceMetrics.REQUESTS)
+        var failures = meterRegistry.get(ServiceMetrics.REQUESTS)
                 .tag("endpoint", "/probe/boom")
                 .tag("outcome", "failure")
                 .counter();
@@ -117,8 +117,8 @@ class CommonCoreIntegrationTest {
         String first = "/no-such-path-" + UUID.randomUUID();
         String second = "/no-such-path-" + UUID.randomUUID();
 
-        rest.getForEntity(first, String.class);
-        rest.getForEntity(second, String.class);
+        testRestTemplate.getForEntity(first, String.class);
+        testRestTemplate.getForEntity(second, String.class);
 
         // Unmatched paths are served by the static resource mapping, whose pattern is "/**".
         // The value itself does not matter — what matters is that random URIs never become
@@ -127,7 +127,7 @@ class CommonCoreIntegrationTest {
     }
 
     private double successCount(String endpoint) {
-        var counter = registry.find(ServiceMetrics.REQUESTS)
+        var counter = meterRegistry.find(ServiceMetrics.REQUESTS)
                 .tag("endpoint", endpoint)
                 .tag("outcome", "success")
                 .counter();
@@ -135,7 +135,7 @@ class CommonCoreIntegrationTest {
     }
 
     private List<String> endpointTags() {
-        return registry.find(ServiceMetrics.REQUESTS).counters().stream()
+        return meterRegistry.find(ServiceMetrics.REQUESTS).counters().stream()
                 .map(c -> c.getId().getTag("endpoint"))
                 .toList();
     }

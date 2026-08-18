@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-1-warehouses" author="petstore">
+        <sql>
+            INSERT INTO warehouse (code, name) VALUES
+                ('MSK', 'Москва, Дмитровское шоссе'),
+                ('SPB', 'Санкт-Петербург, Пулковское шоссе'),
+                ('EKB', 'Екатеринбург, Кольцовский тракт');
+        </sql>
+        <rollback>
+            DELETE FROM warehouse WHERE code IN ('MSK', 'SPB', 'EKB');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-2-reservation-statuses" author="petstore">
+        <comment>The codes here are the ones ReservationStatusCode branches on.</comment>
+        <sql>
+            INSERT INTO reservation_status (code, name) VALUES
+                ('ACTIVE', 'Удерживается'),
+                ('COMMITTED', 'Списан'),
+                ('RELEASED', 'Освобождён'),
+                ('EXPIRED', 'Освобождён по таймауту');
+        </sql>
+        <rollback>
+            DELETE FROM reservation_status WHERE code IN ('ACTIVE', 'COMMITTED', 'RELEASED', 'EXPIRED');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

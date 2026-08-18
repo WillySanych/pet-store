@@ -1,4 +1,4 @@
-package ru.petstore.catalog.domain;
+package ru.petstore.common.reference;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
 /**
- * Shared shape of the catalog reference tables: a surrogate id, a business code and a name.
+ * Shared shape of every reference table in the project: a surrogate id, a business code and a name.
  * The code is what crosses the API boundary — the id stays inside the service.
  */
 @MappedSuperclass

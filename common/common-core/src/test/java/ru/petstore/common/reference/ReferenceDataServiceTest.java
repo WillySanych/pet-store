@@ -1,4 +1,4 @@
-package ru.petstore.catalog.service;
+package ru.petstore.common.reference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,18 +14,24 @@ import ru.petstore.common.web.ServiceUnavailableException;
 
 class ReferenceDataServiceTest {
 
-    private ReferenceDataService references;
+    private enum TestType implements ReferenceKind {
+        CATEGORY,
+        SPECIES,
+        RESERVATION_STATUS
+    }
+
+    private ReferenceDataService referenceDataService;
 
     @BeforeEach
     void setUp() {
-        references = new ReferenceDataService(Map.of(
+        referenceDataService = new ReferenceDataService(TestType.values(), Map.of(
                 "categoryCache", warm("categories", Map.of(
                         "TOYS", new ReferenceItem(2L, "TOYS", "Игрушки"),
                         "FOOD", new ReferenceItem(1L, "FOOD", "Корма"))),
                 "speciesCache", warm("species", Map.of(
                         "DOG", new ReferenceItem(10L, "DOG", "Собаки"))),
-                "brandCache", warm("brands", Map.of(
-                        "TRIXIE", new ReferenceItem(20L, "TRIXIE", "Trixie")))));
+                "reservationStatusCache", warm("reservation-statuses", Map.of(
+                        "ACTIVE", new ReferenceItem(20L, "ACTIVE", "Активен")))));
     }
 
     private static RefreshableReferenceCache<String, ReferenceItem> cache(
@@ -43,7 +49,7 @@ class ReferenceDataServiceTest {
     @Test
     @DisplayName("Справочник отдаётся отсортированным по коду")
     void referenceTableIsReturnedSortedByCode() {
-        assertThat(references.getAll(ReferenceType.CATEGORY))
+        assertThat(referenceDataService.getAll(TestType.CATEGORY))
                 .extracting(ReferenceItem::code)
                 .containsExactly("FOOD", "TOYS");
     }
@@ -51,14 +57,21 @@ class ReferenceDataServiceTest {
     @Test
     @DisplayName("Известный код резолвится в элемент справочника")
     void knownCodeResolvesToItem() {
-        assertThat(references.getRequired(ReferenceType.SPECIES, "DOG").id()).isEqualTo(10L);
-        assertThat(references.getIdOrNull(ReferenceType.BRAND, "TRIXIE")).isEqualTo(20L);
+        assertThat(referenceDataService.getRequired(TestType.SPECIES, "DOG").id()).isEqualTo(10L);
+        assertThat(referenceDataService.getIdOrNull(TestType.RESERVATION_STATUS, "ACTIVE")).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("Составное имя справочника даёт camelCase имя бина кеша")
+    void twoWordReferenceTypeMapsToCamelCaseBeanName() {
+        assertThat(TestType.RESERVATION_STATUS.cacheBeanName()).isEqualTo("reservationStatusCache");
+        assertThat(TestType.CATEGORY.cacheBeanName()).isEqualTo("categoryCache");
     }
 
     @Test
     @DisplayName("Неизвестный код — ошибка клиента, а не пустой результат")
     void unknownCodeIsRejected() {
-        assertThatThrownBy(() -> references.getRequired(ReferenceType.CATEGORY, "NOPE"))
+        assertThatThrownBy(() -> referenceDataService.getRequired(TestType.CATEGORY, "NOPE"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown category code: NOPE");
     }
@@ -66,36 +79,36 @@ class ReferenceDataServiceTest {
     @Test
     @DisplayName("Отсутствующий фильтр не превращается в условие")
     void absentFilterResolvesToNull() {
-        assertThat(references.getIdOrNull(ReferenceType.CATEGORY, null)).isNull();
-        assertThat(references.getIdOrNull(ReferenceType.CATEGORY, "  ")).isNull();
+        assertThat(referenceDataService.getIdOrNull(TestType.CATEGORY, null)).isNull();
+        assertThat(referenceDataService.getIdOrNull(TestType.CATEGORY, "  ")).isNull();
     }
 
     @Test
     @DisplayName("Неизвестный код в фильтре тоже отклоняется")
     void unknownFilterCodeIsRejected() {
-        assertThatThrownBy(() -> references.getIdOrNull(ReferenceType.SPECIES, "DRAGON"))
+        assertThatThrownBy(() -> referenceDataService.getIdOrNull(TestType.SPECIES, "DRAGON"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("Непрогретый кеш отвечает 503, а не выдуманным «неизвестным кодом»")
     void coldCacheIsReportedAsUnavailable() {
-        var cold = new ReferenceDataService(Map.of(
+        var cold = new ReferenceDataService(TestType.values(), Map.of(
                 "categoryCache", cache("categories", Map.of()),
                 "speciesCache", cache("species", Map.of()),
-                "brandCache", cache("brands", Map.of())));
+                "reservationStatusCache", cache("reservation-statuses", Map.of())));
 
-        assertThatThrownBy(() -> cold.getRequired(ReferenceType.CATEGORY, "FOOD"))
+        assertThatThrownBy(() -> cold.getRequired(TestType.CATEGORY, "FOOD"))
                 .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessageContaining("not loaded yet");
-        assertThatThrownBy(() -> cold.getAll(ReferenceType.BRAND))
+        assertThatThrownBy(() -> cold.getAll(TestType.SPECIES))
                 .isInstanceOf(ServiceUnavailableException.class);
     }
 
     @Test
     @DisplayName("Справочник без своего кеша роняет старт, а не первый запрос")
     void referenceTypeWithoutCacheFailsAtStartup() {
-        assertThatThrownBy(() -> new ReferenceDataService(Map.of(
+        assertThatThrownBy(() -> new ReferenceDataService(TestType.values(), Map.of(
                 "categoryCache", cache("categories", Map.of()))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("speciesCache");
@@ -113,11 +126,12 @@ class ReferenceDataServiceTest {
         content.set(Map.of());
         categories.refresh();
 
-        var references = new ReferenceDataService(Map.of(
+        var referenceDataService = new ReferenceDataService(TestType.values(), Map.of(
                 "categoryCache", categories,
                 "speciesCache", warm("species", Map.of("DOG", new ReferenceItem(10L, "DOG", "Собаки"))),
-                "brandCache", warm("brands", Map.of("TRIXIE", new ReferenceItem(20L, "TRIXIE", "Trixie")))));
+                "reservationStatusCache", warm("reservation-statuses",
+                        Map.of("ACTIVE", new ReferenceItem(20L, "ACTIVE", "Активен")))));
 
-        assertThat(references.getRequired(ReferenceType.CATEGORY, "FOOD").id()).isEqualTo(1L);
+        assertThat(referenceDataService.getRequired(TestType.CATEGORY, "FOOD").id()).isEqualTo(1L);
     }
 }

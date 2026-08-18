@@ -1,1 +1,2 @@
 ru.petstore.common.autoconfigure.CommonCoreAutoConfiguration
+ru.petstore.common.scheduler.SchedulerLockAutoConfiguration

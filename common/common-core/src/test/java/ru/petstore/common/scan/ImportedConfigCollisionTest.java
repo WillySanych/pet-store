@@ -13,11 +13,11 @@ import ru.petstore.common.web.GlobalExceptionHandler;
 class ImportedConfigCollisionTest {
 
     @Autowired
-    private ApplicationContext context;
+    private ApplicationContext applicationContext;
 
     @Test
     @DisplayName("Обработчик ошибок не дублируется даже при явном @Import автоконфигурации")
     void exceptionHandlerIsNotDuplicatedWhenAutoConfigurationIsImported() {
-        assertThat(context.getBeansOfType(GlobalExceptionHandler.class)).hasSize(1);
+        assertThat(applicationContext.getBeansOfType(GlobalExceptionHandler.class)).hasSize(1);
     }
 }

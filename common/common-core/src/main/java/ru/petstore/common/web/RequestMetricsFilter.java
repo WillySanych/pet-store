@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.time.Duration;
 import org.springframework.core.Ordered;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.HandlerMapping;
 import ru.petstore.common.metrics.ServiceMetrics;
 
 /**
@@ -16,8 +15,6 @@ import ru.petstore.common.metrics.ServiceMetrics;
  * the counter in Grafana via {@code rate()}.
  */
 public class RequestMetricsFilter extends OncePerRequestFilter implements Ordered {
-
-    private static final String UNKNOWN = "unknown";
 
     private final ServiceMetrics serviceMetrics;
 
@@ -33,15 +30,10 @@ public class RequestMetricsFilter extends OncePerRequestFilter implements Ordere
             chain.doFilter(request, response);
         } finally {
             serviceMetrics.recordRequest(
-                    endpointTemplate(request),
+                    EndpointTemplate.of(request),
                     response.getStatus(),
                     Duration.ofNanos(System.nanoTime() - startedAt));
         }
-    }
-
-    private String endpointTemplate(HttpServletRequest request) {
-        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-        return pattern != null ? pattern.toString() : UNKNOWN;
     }
 
     @Override

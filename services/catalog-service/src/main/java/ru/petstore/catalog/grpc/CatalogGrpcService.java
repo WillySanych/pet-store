@@ -1,5 +1,7 @@
 package ru.petstore.catalog.grpc;
 
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -13,8 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import ru.petstore.catalog.service.ProductService;
 import ru.petstore.catalog.service.ProductSummary;
-import ru.petstore.common.overload.OverloadProtection;
-import ru.petstore.common.overload.OverloadedException;
+import ru.petstore.common.metrics.ServiceMetrics;
 import ru.petstore.proto.catalog.CatalogServiceGrpc;
 import ru.petstore.proto.catalog.GetProductsRequest;
 import ru.petstore.proto.catalog.GetProductsResponse;
@@ -27,17 +28,20 @@ import ru.petstore.proto.catalog.Product;
 @GrpcService
 public class CatalogGrpcService extends CatalogServiceGrpc.CatalogServiceImplBase {
 
-    /** The metric label, matching the shape used for the REST endpoints. */
-    private static final String ENDPOINT = "grpc CatalogService/GetProducts";
+    /** The metric label, taken from the generated stub so it cannot drift from the proto. */
+    private static final String ENDPOINT = CatalogServiceGrpc.getGetProductsMethod().getFullMethodName();
 
     private static final Logger log = LoggerFactory.getLogger(CatalogGrpcService.class);
 
     private final ProductService productService;
-    private final OverloadProtection overloadProtection;
+    private final Bulkhead overloadBulkhead;
+    private final ServiceMetrics serviceMetrics;
 
-    public CatalogGrpcService(ProductService productService, OverloadProtection overloadProtection) {
+    public CatalogGrpcService(ProductService productService, Bulkhead overloadBulkhead,
+                              ServiceMetrics serviceMetrics) {
         this.productService = productService;
-        this.overloadProtection = overloadProtection;
+        this.overloadBulkhead = overloadBulkhead;
+        this.serviceMetrics = serviceMetrics;
     }
 
     @Override
@@ -68,11 +72,13 @@ public class CatalogGrpcService extends CatalogServiceGrpc.CatalogServiceImplBas
 
     private GetProductsResponse load(Set<UUID> ids) {
         try {
-            return overloadProtection.call(ENDPOINT, () -> build(productService.getProductSummaries(List.copyOf(ids))));
-        } catch (OverloadedException e) {
-            log.warn("gRPC request rejected due to overloadProtection: {}", ENDPOINT);
+            return overloadBulkhead.executeSupplier(
+                    () -> build(productService.getProductSummaries(List.copyOf(ids))));
+        } catch (BulkheadFullException e) {
+            serviceMetrics.recordOverloadRejected(ENDPOINT);
+            log.warn("gRPC request rejected due to overload: {}", ENDPOINT);
             throw Status.RESOURCE_EXHAUSTED
-                    .withDescription(e.getMessage()).asRuntimeException();
+                    .withDescription("Service is busy, retry later").asRuntimeException();
         } catch (DataAccessException e) {
             log.error("Catalog database unavailable while serving {}", ENDPOINT, e);
             throw Status.UNAVAILABLE

@@ -1,8 +1,8 @@
 package ru.petstore.catalog.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import ru.petstore.catalog.domain.ReferenceEntity;
-import ru.petstore.catalog.service.ReferenceItem;
+import ru.petstore.common.reference.ReferenceEntity;
+import ru.petstore.common.reference.ReferenceItem;
 
 @Schema(description = "Элемент справочника")
 public record ReferenceResponse(

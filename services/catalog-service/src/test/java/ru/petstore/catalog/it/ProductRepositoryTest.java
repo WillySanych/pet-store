@@ -26,13 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.catalog.domain.Brand;
 import ru.petstore.catalog.domain.Category;
 import ru.petstore.catalog.domain.Product;
-import ru.petstore.catalog.domain.ReferenceEntity;
 import ru.petstore.catalog.domain.Species;
 import ru.petstore.catalog.repository.BrandRepository;
 import ru.petstore.catalog.repository.CategoryRepository;
 import ru.petstore.catalog.repository.ProductRepository;
 import ru.petstore.catalog.repository.ProductSpecifications;
 import ru.petstore.catalog.repository.SpeciesRepository;
+import ru.petstore.common.reference.ReferenceEntity;
 import ru.petstore.catalog.service.ProductSummary;
 
 @SpringBootTest(properties = {
@@ -44,17 +44,17 @@ import ru.petstore.catalog.service.ProductSummary;
 class ProductRepositoryTest extends AbstractPostgresTest {
 
     @Autowired
-    private ProductRepository products;
+    private ProductRepository productRepository;
     @Autowired
-    private CategoryRepository categories;
+    private CategoryRepository categoryRepository;
     @Autowired
-    private SpeciesRepository species;
+    private SpeciesRepository speciesRepository;
     @Autowired
-    private BrandRepository brands;
+    private BrandRepository brandRepository;
     @Autowired
-    private JdbcTemplate jdbc;
+    private JdbcTemplate jdbcTemplate;
     @PersistenceContext
-    private EntityManager em;
+    private EntityManager entityManager;
 
     private Map<String, Category> categoriesByCode;
     private Species dog;
@@ -62,11 +62,11 @@ class ProductRepositoryTest extends AbstractPostgresTest {
 
     @BeforeEach
     void isolateFromCommittedProducts() {
-        products.deleteAllInBatch();
-        categoriesByCode = categories.findAll().stream()
+        productRepository.deleteAllInBatch();
+        categoriesByCode = categoryRepository.findAll().stream()
                 .collect(Collectors.toMap(Category::getCode, category -> category));
-        dog = byCode(species, "DOG");
-        trixie = byCode(brands, "TRIXIE");
+        dog = byCode(speciesRepository, "DOG");
+        trixie = byCode(brandRepository, "TRIXIE");
     }
 
     private static <T extends ReferenceEntity> T byCode(JpaRepository<T, Long> repository, String code) {
@@ -75,12 +75,12 @@ class ProductRepositoryTest extends AbstractPostgresTest {
     }
 
     private Statistics statistics() {
-        return em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        return entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
     }
 
     private Statistics detachedWithFreshStatistics() {
-        em.flush();
-        em.clear();
+        entityManager.flush();
+        entityManager.clear();
         Statistics statistics = statistics();
         statistics.clear();
         return statistics;
@@ -95,22 +95,22 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         product.setCategory(categoriesByCode.get(categoryCode));
         product.setSpecies(dog);
         product.setBrand(trixie);
-        return products.saveAndFlush(product);
+        return productRepository.saveAndFlush(product);
     }
 
     @Test
     @DisplayName("Миграции создают схему и наполняют справочники")
     void migrationsCreateSchemaAndSeedReferenceTables() {
-        assertThat(categories.findAll()).extracting(Category::getCode)
+        assertThat(categoryRepository.findAll()).extracting(Category::getCode)
                 .contains("FOOD", "TOYS", "HYGIENE", "ACCESSORIES", "HEALTH", "HOUSING");
-        assertThat(species.findAll()).hasSize(6);
-        assertThat(brands.findAll()).hasSize(6);
+        assertThat(speciesRepository.findAll()).hasSize(6);
+        assertThat(brandRepository.findAll()).hasSize(6);
     }
 
     @Test
     @DisplayName("Демо-товары не приезжают в тесты: changeset под контекстом demo не выполнялся")
     void demoProductsAreNotLoadedUnderTestContext() {
-        Long applied = jdbc.queryForObject(
+        Long applied = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM catalog.databasechangelog WHERE id = '003-1-demo-products'",
                 Long.class);
 
@@ -135,10 +135,10 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         save("SKU-3", "Игрушка", "TOYS", true);
 
         Specification<Product> spec = Specification.allOf(List.of(
-                ProductSpecifications.referenceIs("category", byCode(categories, "FOOD").getId()),
+                ProductSpecifications.referenceIs("category", byCode(categoryRepository, "FOOD").getId()),
                 ProductSpecifications.activeIs(true)));
 
-        assertThat(products.findAll(spec, PageRequest.of(0, 10)).getContent())
+        assertThat(productRepository.findAll(spec, PageRequest.of(0, 10)).getContent())
                 .extracting(Product::getSku)
                 .containsExactly("SKU-1");
     }
@@ -153,7 +153,7 @@ class ProductRepositoryTest extends AbstractPostgresTest {
                 ProductSpecifications.referenceIs("category", null),
                 ProductSpecifications.activeIs(null));
 
-        assertThat(products.findAll(spec, PageRequest.of(0, 10)).getContent())
+        assertThat(productRepository.findAll(spec, PageRequest.of(0, 10)).getContent())
                 .extracting(Product::getSku)
                 .containsExactlyInAnyOrder("SKU-1", "SKU-2");
     }
@@ -165,7 +165,7 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         save("SKU-B", "Борис", "FOOD", true);
         save("SKU-C", "Виктор", "FOOD", true);
 
-        var page = products.findAll(
+        var page = productRepository.findAll(
                 Specification.allOf(List.of()),
                 PageRequest.of(1, 2, Sort.by("name")));
 
@@ -190,7 +190,7 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         var second = save("SKU-P2", "Борис", "TOYS", false);
         save("SKU-P3", "Виктор", "FOOD", true);
 
-        var summaries = products.findAllByIdIn(List.of(first.getId(), second.getId()));
+        var summaries = productRepository.findAllByIdIn(List.of(first.getId(), second.getId()));
 
         assertThat(summaries).extracting(ProductSummary::name)
                 .containsExactlyInAnyOrder("Аарон", "Борис");
@@ -204,7 +204,7 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         var saved = save("SKU-GRAPH", "Товар", "FOOD", true);
         var statistics = detachedWithFreshStatistics();
 
-        var found = products.findById(saved.getId()).orElseThrow();
+        var found = productRepository.findById(saved.getId()).orElseThrow();
 
         assertThat(found.getCategory().getCode()).isEqualTo("FOOD");
         assertThat(found.getSpecies().getCode()).isEqualTo("DOG");
@@ -220,7 +220,7 @@ class ProductRepositoryTest extends AbstractPostgresTest {
         save("SKU-N1-C", "Виктор", "HEALTH", true);
         var statistics = detachedWithFreshStatistics();
 
-        var page = products.findAll(Specification.<Product>unrestricted(),
+        var page = productRepository.findAll(Specification.<Product>unrestricted(),
                 PageRequest.of(0, 10, Sort.by("name")));
 
         assertThat(page.getContent()).hasSize(3);
