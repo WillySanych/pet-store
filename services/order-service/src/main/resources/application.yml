@@ -7,17 +7,108 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:petstore}
+    username: ${DB_USER:petstore}
+    password: ${DB_PASSWORD:petstore}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: orders
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: orders
+    contexts: ${LIQUIBASE_CONTEXTS:default}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 5000
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
-      show-details: always
-  metrics:
-    tags:
-      service: ${spring.application.name}
+grpc:
+  client:
+    catalog:
+      address: ${CATALOG_GRPC:static://localhost:9101}
+      negotiation-type: plaintext
+    inventory:
+      address: ${INVENTORY_GRPC:static://localhost:9102}
+      negotiation-type: plaintext
+
+resilience4j:
+  retry:
+    configs:
+      upstream:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          - ru.petstore.order.client.UpstreamUnavailableException
+    instances:
+      catalog:
+        base-config: upstream
+      inventory:
+        base-config: upstream
+      customer:
+        base-config: upstream
+  circuitbreaker:
+    configs:
+      upstream:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - ru.petstore.order.client.UpstreamUnavailableException
+    instances:
+      catalog:
+        base-config: upstream
+      inventory:
+        base-config: upstream
+      customer:
+        base-config: upstream
+  timelimiter:
+    configs:
+      upstream:
+        timeout-duration: 2s
+        cancel-running-future: true
+    instances:
+      catalog:
+        base-config: upstream
+      inventory:
+        base-config: upstream
+      customer:
+        base-config: upstream
+  ratelimiter:
+    instances:
+      orders:
+        limit-for-period: ${ORDERS_RATE_LIMIT:200}
+        limit-refresh-period: 1s
+        timeout-duration: 0
+
+petstore:
+  scheduler:
+    table-name: orders.shedlock
+  order:
+    customer-service-url: ${CUSTOMER_URL:http://localhost:8083}
+    customer-timeout: PT2S
+    upstream-deadline: PT2S
+    order-events-topic: order-events
+    order-events-partitions: 3
+    order-events-replicas: 1
+    outbox-batch-size: 50
+    outbox-max-attempts: 10
+    outbox-poll-interval: PT1S
+    outbox-send-timeout: PT5S

@@ -11,7 +11,6 @@
 | `inventory-service`    | 8082, gRPC 9102 | `inventory`    |
 | `customer-service`     | 8083            | `customer`     |
 | `order-service`        | 8084            | `orders`       |
-| `subscription-service` | 8085            | `subscription` |
 
 Общие модули: `common/common-core` (кеши, справочники, метрики, сквозное логирование, защита
 от перегрузки, блокировка планировщиков), `common/common-proto` (контракты gRPC).
@@ -42,7 +41,7 @@ docker compose -f deploy/docker-compose.yml up -d
 | Prometheus | http://localhost:9090 | —                                               |
 | Grafana    | http://localhost:3000 | `admin` / `admin`                               |
 
-Пять схем (`catalog`, `inventory`, `customer`, `orders`, `subscription`) создаются автоматически
+Четыре схемы (`catalog`, `inventory`, `customer`, `orders`) создаются автоматически
 при первой инициализации тома скриптом `deploy/postgres/init/01-schemas.sql`.
 
 Остановить с сохранением данных — `docker compose -f deploy/docker-compose.yml stop`.
@@ -103,3 +102,15 @@ mvn -pl services/customer-service spring-boot:run
 за вызывающим.
 
 Три демо-клиента с адресами — под контекстом `demo`: `LIQUIBASE_CONTEXTS=demo`.
+
+### `order-service`
+
+```bash
+mvn -pl services/order-service spring-boot:run
+```
+
+Оформление заказов: REST на 8084, gRPC-клиент каталога и склада, продюсер Kafka `order-events`.
+Таблицы схемы `orders` и справочники (`order_status`, `delivery_type`, `payment_method`) заводит
+Liquibase при старте.
+
+Демо-заказов нет: заказ создаётся через API на демо-данных каталога, склада и клиентов.

@@ -43,8 +43,18 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Планировщики. Сам spring-jdbc, а не стартер: нужен только JdbcTemplate,
-             пул соединений приносит starter-data-jpa. -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-api</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-jdbc</artifactId>

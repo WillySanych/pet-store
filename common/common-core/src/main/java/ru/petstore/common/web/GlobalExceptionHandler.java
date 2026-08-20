@@ -4,7 +4,7 @@ import io.github.resilience4j.bulkhead.BulkheadFullException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -22,7 +22,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /** Seconds before retrying a rejected request. */
-    private static final String RETRY_AFTER_SECONDS = "5";
+    public static final String RETRY_AFTER_SECONDS = "5";
 
     private final ServiceMetrics serviceMetrics;
 
@@ -46,6 +46,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
                 .body(ApiErrorResponse.of("CONCURRENT_CHANGE", e.getMessage(), requestId()));
+    }
+
+    /** A lost optimistic lock says the same as {@link ConcurrentChangeException}: repeat the request. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiErrorResponse> handleOptimisticLock(OptimisticLockingFailureException e) {
+        serviceMetrics.recordError("concurrent_change");
+        log.warn("Request lost a race: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+                .body(ApiErrorResponse.of("CONCURRENT_CHANGE",
+                        "Resource changed concurrently, retry the request", requestId()));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -115,7 +126,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).body(ApiErrorResponse.of(code, message, requestId()));
     }
 
-    private String requestId() {
-        return MDC.get(RequestTracingFilter.MDC_KEY);
+    private static String requestId() {
+        return RequestTracingFilter.currentRequestId();
     }
 }

@@ -7,10 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -69,6 +71,11 @@ class GlobalExceptionHandlerTest {
             throw new ConcurrentChangeException("Stock for product 42 changed concurrently",
                     new IllegalStateException("version mismatch"));
         }
+
+        @GetMapping("/stale")
+        String stale() {
+            throw new OptimisticLockingFailureException("Order " + UUID.randomUUID() + " changed");
+        }
     }
 
     private final MockMvc mockMvc = MockMvcBuilders
@@ -88,6 +95,15 @@ class GlobalExceptionHandlerTest {
     @DisplayName("Проигранная гонка отдаёт 409 с Retry-After, а не 500")
     void concurrentChangeReturns409() throws Exception {
         mockMvc.perform(get("/raced"))
+                .andExpect(status().isConflict())
+                .andExpect(header().string("Retry-After", "5"))
+                .andExpect(jsonPath("$.code").value("CONCURRENT_CHANGE"));
+    }
+
+    @Test
+    @DisplayName("Проигранная оптимистичная блокировка — тоже 409, а не 500")
+    void optimisticLockFailureReturns409() throws Exception {
+        mockMvc.perform(get("/stale"))
                 .andExpect(status().isConflict())
                 .andExpect(header().string("Retry-After", "5"))
                 .andExpect(jsonPath("$.code").value("CONCURRENT_CHANGE"));

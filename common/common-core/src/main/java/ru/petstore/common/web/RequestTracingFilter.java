@@ -27,6 +27,11 @@ public class RequestTracingFilter extends OncePerRequestFilter implements Ordere
         this.headerName = headerName;
     }
 
+    /** The identifier of the request being handled, for error bodies and outgoing calls. */
+    public static String currentRequestId() {
+        return MDC.get(MDC_KEY);
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {

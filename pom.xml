@@ -27,7 +27,6 @@
         <module>services/inventory-service</module>
         <module>services/customer-service</module>
         <module>services/order-service</module>
-        <module>services/subscription-service</module>
         <module>benchmarks</module>
     </modules>
 
@@ -116,6 +115,11 @@
             <dependency>
                 <groupId>io.github.resilience4j</groupId>
                 <artifactId>resilience4j-bulkhead</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
                 <version>${resilience4j.version}</version>
             </dependency>
 

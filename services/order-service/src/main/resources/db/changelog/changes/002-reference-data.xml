@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-1-order-statuses" author="petstore">
+        <comment>The codes here are the ones OrderStatusCode branches on.</comment>
+        <sql>
+            INSERT INTO order_status (code, name) VALUES
+                ('NEW', 'Новый'),
+                ('CONFIRMED', 'Подтверждён'),
+                ('CANCELLED', 'Отменён');
+        </sql>
+        <rollback>
+            DELETE FROM order_status WHERE code IN ('NEW', 'CONFIRMED', 'CANCELLED');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-2-delivery-types" author="petstore">
+        <sql>
+            INSERT INTO delivery_type (code, name) VALUES
+                ('COURIER', 'Курьер'),
+                ('PICKUP', 'Самовывоз'),
+                ('POST', 'Почта');
+        </sql>
+        <rollback>
+            DELETE FROM delivery_type WHERE code IN ('COURIER', 'PICKUP', 'POST');
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-3-payment-methods" author="petstore">
+        <sql>
+            INSERT INTO payment_method (code, name) VALUES
+                ('CARD', 'Банковская карта'),
+                ('SBP', 'Система быстрых платежей'),
+                ('CASH', 'Наличными при получении');
+        </sql>
+        <rollback>
+            DELETE FROM payment_method WHERE code IN ('CARD', 'SBP', 'CASH');
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

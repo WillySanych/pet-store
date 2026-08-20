@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="003-1-shedlock" author="petstore">
+        <comment>
+            The lock table behind the outbox publisher. It lives in the schema of the service; the
+            provider is configured with the qualified name in application.yml.
+        </comment>
+        <sql>
+            CREATE TABLE shedlock (
+                name       VARCHAR(64) NOT NULL,
+                lock_until TIMESTAMP NOT NULL,
+                locked_at  TIMESTAMP NOT NULL,
+                locked_by  VARCHAR(255) NOT NULL,
+                CONSTRAINT pk_shedlock PRIMARY KEY (name)
+            );
+        </sql>
+        <rollback>
+            DROP TABLE shedlock;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

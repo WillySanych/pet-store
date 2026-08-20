@@ -1,2 +1,3 @@
 ru.petstore.common.autoconfigure.CommonCoreAutoConfiguration
 ru.petstore.common.scheduler.SchedulerLockAutoConfiguration
+ru.petstore.common.kafka.KafkaTracingAutoConfiguration
