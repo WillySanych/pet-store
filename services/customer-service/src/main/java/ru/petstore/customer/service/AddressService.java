@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.common.reference.ReferenceDataService;
 import ru.petstore.common.reference.ReferenceItem;
 import ru.petstore.common.web.ConcurrentChangeException;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.common.web.ResourceNotFoundException;
 import ru.petstore.customer.domain.Address;
 import ru.petstore.customer.domain.Customer;
@@ -17,7 +18,6 @@ import ru.petstore.customer.repository.CityRepository;
 import ru.petstore.customer.repository.CustomerRepository;
 import ru.petstore.customer.web.dto.AddressRequest;
 import ru.petstore.customer.web.dto.AddressResponse;
-import ru.petstore.customer.web.dto.ReferenceResponse;
 
 /**
  * Addresses of a customer, and the invariant order-service leans on: a customer who has addresses

@@ -19,12 +19,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.petstore.common.web.PageResponse;
 import ru.petstore.customer.service.CustomerService;
 import ru.petstore.customer.web.dto.CustomerFilterRequest;
 import ru.petstore.customer.web.dto.CustomerRequest;
 import ru.petstore.customer.web.dto.CustomerResponse;
 import ru.petstore.customer.web.dto.DeliveryTargetResponse;
-import ru.petstore.customer.web.dto.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/customers")

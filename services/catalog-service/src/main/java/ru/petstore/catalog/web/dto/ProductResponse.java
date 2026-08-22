@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import ru.petstore.catalog.domain.Product;
+import ru.petstore.common.web.ReferenceResponse;
 
 @Schema(description = "Товар каталога")
 public record ProductResponse(

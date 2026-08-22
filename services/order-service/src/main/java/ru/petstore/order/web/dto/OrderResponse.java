@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.order.domain.CustomerOrder;
 
 @Schema(description = "Заказ")

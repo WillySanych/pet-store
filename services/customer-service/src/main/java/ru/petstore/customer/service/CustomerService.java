@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.common.reference.ReferenceDataService;
 import ru.petstore.common.reference.ReferenceItem;
+import ru.petstore.common.web.PageResponse;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.common.web.ResourceNotFoundException;
 import ru.petstore.customer.domain.Address;
 import ru.petstore.customer.domain.Customer;
@@ -26,8 +28,6 @@ import ru.petstore.customer.web.dto.CustomerFilterRequest;
 import ru.petstore.customer.web.dto.CustomerRequest;
 import ru.petstore.customer.web.dto.CustomerResponse;
 import ru.petstore.customer.web.dto.DeliveryTargetResponse;
-import ru.petstore.customer.web.dto.PageResponse;
-import ru.petstore.customer.web.dto.ReferenceResponse;
 
 @Service
 @Transactional(readOnly = true)

@@ -103,12 +103,4 @@ petstore:
     table-name: orders.shedlock
   order:
     customer-service-url: ${CUSTOMER_URL:http://localhost:8083}
-    customer-timeout: PT2S
-    upstream-deadline: PT2S
     order-events-topic: order-events
-    order-events-partitions: 3
-    order-events-replicas: 1
-    outbox-batch-size: 50
-    outbox-max-attempts: 10
-    outbox-poll-interval: PT1S
-    outbox-send-timeout: PT5S

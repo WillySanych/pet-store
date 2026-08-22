@@ -15,13 +15,13 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import ru.petstore.common.web.PageResponse;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.customer.web.dto.AddressRequest;
 import ru.petstore.customer.web.dto.AddressResponse;
 import ru.petstore.customer.web.dto.CustomerRequest;
 import ru.petstore.customer.web.dto.CustomerResponse;
 import ru.petstore.customer.web.dto.DeliveryTargetResponse;
-import ru.petstore.customer.web.dto.PageResponse;
-import ru.petstore.customer.web.dto.ReferenceResponse;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "spring.liquibase.contexts=test")

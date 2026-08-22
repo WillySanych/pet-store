@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.petstore.common.reference.ReferenceItem;
 import ru.petstore.common.web.ConcurrentChangeException;
+import ru.petstore.common.web.PageResponse;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.common.web.ResourceNotFoundException;
 import ru.petstore.order.client.CatalogClient;
 import ru.petstore.order.client.CatalogProduct;
@@ -43,8 +45,6 @@ import ru.petstore.order.web.dto.OrderItemRequest;
 import ru.petstore.order.web.dto.OrderRequest;
 import ru.petstore.order.web.dto.OrderResponse;
 import ru.petstore.order.web.dto.OrderStatusHistoryResponse;
-import ru.petstore.order.web.dto.PageResponse;
-import ru.petstore.order.web.dto.ReferenceResponse;
 
 @Service
 public class OrderService {

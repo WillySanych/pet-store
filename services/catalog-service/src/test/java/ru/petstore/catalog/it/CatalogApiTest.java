@@ -15,10 +15,10 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import ru.petstore.catalog.web.dto.PageResponse;
 import ru.petstore.catalog.web.dto.ProductRequest;
 import ru.petstore.catalog.web.dto.ProductResponse;
-import ru.petstore.catalog.web.dto.ReferenceResponse;
+import ru.petstore.common.web.PageResponse;
+import ru.petstore.common.web.ReferenceResponse;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.liquibase.contexts=test",
@@ -134,6 +134,15 @@ class CatalogApiTest extends AbstractPostgresTest {
 
         assertThat(parameters).extracting(parameter -> parameter.get("name").asText())
                 .contains("category", "species", "brand", "active");
+    }
+
+    @Test
+    @DisplayName("Название и версия API берутся из @OpenAPIDefinition")
+    void apiDocsCarryServiceInfo() {
+        var info = testRestTemplate.getForObject("/v3/api-docs", JsonNode.class).path("info");
+
+        assertThat(info.path("title").asText()).isEqualTo("catalog-service API");
+        assertThat(info.path("version").asText()).isEqualTo("v1");
     }
 
     @Test

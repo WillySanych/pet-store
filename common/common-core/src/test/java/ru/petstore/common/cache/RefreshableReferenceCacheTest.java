@@ -67,7 +67,6 @@ class RefreshableReferenceCacheTest {
 
         // Loaded in c, a, b order — ConcurrentSkipListMap returns them ascending by key
         assertThat(cache.all()).containsExactly("Alpha", "Bravo", "Charlie");
-        assertThat(cache.range("a", "b")).containsOnlyKeys("a", "b");
     }
 
     @Test

@@ -8,11 +8,11 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.common.reference.ReferenceDataService;
 import ru.petstore.common.reference.ReferenceItem;
 import ru.petstore.common.web.ConcurrentChangeException;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.common.web.ResourceNotFoundException;
 import ru.petstore.inventory.domain.StockItem;
 import ru.petstore.inventory.repository.StockItemRepository;
 import ru.petstore.inventory.repository.WarehouseRepository;
-import ru.petstore.inventory.web.dto.ReferenceResponse;
 import ru.petstore.inventory.web.dto.StockRequest;
 import ru.petstore.inventory.web.dto.StockResponse;
 

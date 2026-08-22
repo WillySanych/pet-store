@@ -44,6 +44,4 @@ petstore:
   scheduler:
     table-name: inventory.shedlock
   inventory:
-    reservation-ttl: PT15M
-    expiry-scan-interval: PT1M
     order-events-topic: order-events

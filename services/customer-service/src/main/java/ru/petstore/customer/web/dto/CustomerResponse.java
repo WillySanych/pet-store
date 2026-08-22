@@ -3,6 +3,7 @@ package ru.petstore.customer.web.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.customer.domain.Customer;
 
 @Schema(description = "Клиент")

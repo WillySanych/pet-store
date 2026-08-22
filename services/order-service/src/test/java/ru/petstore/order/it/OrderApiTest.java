@@ -24,6 +24,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.order.client.CatalogClient;
 import ru.petstore.order.client.CatalogProduct;
 import ru.petstore.order.client.CustomerClient;
@@ -38,7 +39,6 @@ import ru.petstore.order.web.OrderController;
 import ru.petstore.order.web.dto.OrderItemRequest;
 import ru.petstore.order.web.dto.OrderRequest;
 import ru.petstore.order.web.dto.OrderResponse;
-import ru.petstore.order.web.dto.ReferenceResponse;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {

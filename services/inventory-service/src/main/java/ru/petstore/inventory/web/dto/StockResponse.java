@@ -2,6 +2,7 @@ package ru.petstore.inventory.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.inventory.domain.StockItem;
 
 @Schema(description = "Остаток по товару")

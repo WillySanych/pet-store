@@ -20,12 +20,12 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.petstore.common.web.PageResponse;
 import ru.petstore.order.service.OrderCreation;
 import ru.petstore.order.service.OrderService;
 import ru.petstore.order.web.dto.OrderRequest;
 import ru.petstore.order.web.dto.OrderResponse;
 import ru.petstore.order.web.dto.OrderStatusHistoryResponse;
-import ru.petstore.order.web.dto.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/orders")

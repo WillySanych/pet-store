@@ -1,4 +1,4 @@
-package ru.petstore.customer.web.dto;
+package ru.petstore.common.web;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;

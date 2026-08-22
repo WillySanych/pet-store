@@ -1,7 +1,6 @@
 package ru.petstore.common.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -78,16 +77,5 @@ class ReferenceCacheRegistryTest {
         var indicator = new CacheWarmupHealthIndicator(registry);
 
         assertThat(indicator.health().getStatus()).isEqualTo(Status.UP);
-    }
-
-    @Test
-    @DisplayName("Диапазон с перепутанными границами даёт внятную ошибку")
-    void rangeWithSwappedBoundsFailsClearly() {
-        var cache = new RefreshableReferenceCache<>("categories",
-                () -> Map.of("a", "Alpha", "b", "Bravo"));
-        cache.refresh();
-
-        assertThatThrownBy(() -> cache.range("b", "a"))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.petstore.catalog.service.ProductService;
-import ru.petstore.catalog.web.dto.PageResponse;
 import ru.petstore.catalog.web.dto.ProductFilterRequest;
 import ru.petstore.catalog.web.dto.ProductRequest;
 import ru.petstore.catalog.web.dto.ProductResponse;
+import ru.petstore.common.web.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/products")

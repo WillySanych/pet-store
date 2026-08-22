@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.petstore.common.reference.ReferenceDataService;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.order.service.ReferenceType;
-import ru.petstore.order.web.dto.ReferenceResponse;
 
 @RestController
 @RequestMapping("/api/v1")

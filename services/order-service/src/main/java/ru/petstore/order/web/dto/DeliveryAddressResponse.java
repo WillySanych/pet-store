@@ -1,6 +1,7 @@
 package ru.petstore.order.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.order.domain.DeliveryAddress;
 
 @Schema(description = "Адрес доставки на момент оформления заказа")

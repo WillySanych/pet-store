@@ -15,9 +15,9 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import ru.petstore.common.web.ReferenceResponse;
 import ru.petstore.inventory.service.ReservationService;
 import ru.petstore.inventory.service.ReserveLine;
-import ru.petstore.inventory.web.dto.ReferenceResponse;
 import ru.petstore.inventory.web.dto.StockRequest;
 import ru.petstore.inventory.web.dto.StockResponse;
 

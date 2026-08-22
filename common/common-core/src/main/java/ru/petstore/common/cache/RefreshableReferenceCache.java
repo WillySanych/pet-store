@@ -3,7 +3,6 @@ package ru.petstore.common.cache;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -59,15 +58,6 @@ public class RefreshableReferenceCache<K extends Comparable<K>, V> {
         lock.readLock().lock();
         try {
             return List.copyOf(sorted.values());
-        } finally {
-            lock.readLock().unlock();
-        }
-    }
-
-    public NavigableMap<K, V> range(K fromInclusive, K toInclusive) {
-        lock.readLock().lock();
-        try {
-            return new java.util.TreeMap<>(sorted.subMap(fromInclusive, true, toInclusive, true));
         } finally {
             lock.readLock().unlock();
         }
