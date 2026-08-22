@@ -42,7 +42,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> reject(ServerWebExchange exchange) {
-        metrics.recordRateLimited(RequestMetricsFilter.endpointOf(exchange));
+        String endpoint = RequestMetricsFilter.endpointOf(exchange);
+        metrics.recordRateLimited(endpoint);
+        log.warn("Request to {} rejected: the gateway is over {} request(s) per window",
+                endpoint, limiter.limitForPeriod());
 
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);

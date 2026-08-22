@@ -48,21 +48,11 @@ public class GatewayProperties {
 
     public static class RateLimit {
 
-        private boolean enabled = true;
-
         @Min(1)
         private int limitForPeriod = 500;
 
         @DurationMin(millis = 1)
         private Duration refreshPeriod = Duration.ofSeconds(1);
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
 
         public int getLimitForPeriod() {
             return limitForPeriod;

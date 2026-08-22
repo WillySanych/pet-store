@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import org.springframework.core.Ordered;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import ru.petstore.common.metrics.ServiceMetrics;
 
@@ -17,9 +18,19 @@ import ru.petstore.common.metrics.ServiceMetrics;
 public class RequestMetricsFilter extends OncePerRequestFilter implements Ordered {
 
     private final ServiceMetrics serviceMetrics;
+    private final String excludePrefix;
 
-    public RequestMetricsFilter(ServiceMetrics serviceMetrics) {
+    public RequestMetricsFilter(ServiceMetrics serviceMetrics, String excludePrefix) {
+        if (!StringUtils.hasText(excludePrefix)) {
+            throw new IllegalArgumentException("petstore.metrics.exclude-prefix must not be blank");
+        }
         this.serviceMetrics = serviceMetrics;
+        this.excludePrefix = excludePrefix;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getRequestURI().startsWith(excludePrefix);
     }
 
     @Override

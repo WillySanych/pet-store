@@ -44,8 +44,8 @@ public class CommonCoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public RequestMetricsFilter requestMetricsFilter(ServiceMetrics metrics) {
-        return new RequestMetricsFilter(metrics);
+    public RequestMetricsFilter requestMetricsFilter(ServiceMetrics metrics, CommonCoreProperties properties) {
+        return new RequestMetricsFilter(metrics, properties.getMetrics().getExcludePrefix());
     }
 
     @Bean

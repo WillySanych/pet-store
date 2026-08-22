@@ -41,6 +41,8 @@ springdoc:
     operations-sorter: method
 
 petstore:
+  metrics:
+    exclude-prefix: /actuator
   gateway:
     services:
       catalog: ${CATALOG_URL:http://localhost:8081}

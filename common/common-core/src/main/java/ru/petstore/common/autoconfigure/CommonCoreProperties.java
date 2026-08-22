@@ -9,11 +9,16 @@ import ru.petstore.common.web.RequestTracingFilter;
 public class CommonCoreProperties {
 
     private final Tracing tracing = new Tracing();
+    private final Metrics metrics = new Metrics();
     private final Overload overload = new Overload();
     private final Scheduler scheduler = new Scheduler();
 
     public Tracing getTracing() {
         return tracing;
+    }
+
+    public Metrics getMetrics() {
+        return metrics;
     }
 
     public Overload getOverload() {
@@ -33,6 +38,18 @@ public class CommonCoreProperties {
 
         public void setHeaderName(String headerName) {
             this.headerName = headerName;
+        }
+    }
+
+    public static class Metrics {
+        private String excludePrefix = "/actuator";
+
+        public String getExcludePrefix() {
+            return excludePrefix;
+        }
+
+        public void setExcludePrefix(String excludePrefix) {
+            this.excludePrefix = excludePrefix;
         }
     }
 

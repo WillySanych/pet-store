@@ -37,7 +37,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
     void pathIsRoutedToItsService(String path, String service) {
         client.get().uri(path).exchange().expectStatus().isOk();
 
-        assertThat(upstream(service).lastRequest().path()).isEqualTo(path);
+        assertThat(upstream(service).awaitRequest().path()).isEqualTo(path);
         UPSTREAMS.forEach((name, stub) -> {
             if (!name.equals(service)) {
                 assertThat(stub.requestCount()).as("лишний запрос в %s", name).isZero();
@@ -54,7 +54,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
                 .exchange()
                 .expectStatus().isOk();
 
-        assertThat(upstream("order").lastRequest().method()).isEqualTo("POST");
+        assertThat(upstream("order").awaitRequest().method()).isEqualTo("POST");
     }
 
     @Test
@@ -67,7 +67,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
                 .getResponseHeaders()
                 .getFirst(RequestTracingFilter.REQUEST_ID_HEADER);
 
-        assertThat(upstream("catalog").lastRequest().requestId()).isEqualTo(issued);
+        assertThat(upstream("catalog").awaitRequest().requestId()).isEqualTo(issued);
     }
 
     @Test
@@ -81,7 +81,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
                 .expectStatus().isOk()
                 .expectHeader().valueEquals(RequestTracingFilter.REQUEST_ID_HEADER, incoming);
 
-        assertThat(upstream("catalog").lastRequest().requestId()).isEqualTo(incoming);
+        assertThat(upstream("catalog").awaitRequest().requestId()).isEqualTo(incoming);
     }
 
     @Test
@@ -113,7 +113,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
     void apiDocsOfAServiceAreProxied() {
         client.get().uri("/api-docs/catalog").exchange().expectStatus().isOk();
 
-        assertThat(upstream("catalog").lastRequest().path()).isEqualTo("/v3/api-docs");
+        assertThat(upstream("catalog").awaitRequest().path()).isEqualTo("/v3/api-docs");
     }
 
     @Test

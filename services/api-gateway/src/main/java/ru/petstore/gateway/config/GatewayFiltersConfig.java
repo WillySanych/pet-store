@@ -3,7 +3,6 @@ package ru.petstore.gateway.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +20,8 @@ public class GatewayFiltersConfig {
     static final String TRACING_HEADER =
             "${petstore.tracing.header-name:" + RequestTracingFilter.REQUEST_ID_HEADER + "}";
 
+    static final String METRICS_EXCLUDE_PREFIX = "${petstore.metrics.exclude-prefix:/actuator}";
+
     @Bean
     public GatewayMetrics gatewayMetrics(MeterRegistry meterRegistry) {
         return new GatewayMetrics(meterRegistry);
@@ -32,8 +33,9 @@ public class GatewayFiltersConfig {
     }
 
     @Bean
-    public RequestMetricsFilter requestMetricsFilter(GatewayMetrics metrics, WebEndpointProperties endpoints) {
-        return new RequestMetricsFilter(metrics, endpoints.getBasePath());
+    public RequestMetricsFilter requestMetricsFilter(GatewayMetrics metrics,
+                                                     @Value(METRICS_EXCLUDE_PREFIX) String excludePrefix) {
+        return new RequestMetricsFilter(metrics, excludePrefix);
     }
 
     @Configuration(proxyBeanMethods = false)

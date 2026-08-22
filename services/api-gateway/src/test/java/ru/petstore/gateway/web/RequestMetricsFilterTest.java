@@ -1,6 +1,7 @@
 package ru.petstore.gateway.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static ru.petstore.gateway.web.RoutedExchanges.routed;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -75,5 +76,28 @@ class RequestMetricsFilterTest {
                 EMPTY_CHAIN).block();
 
         assertThat(registry.find(GatewayMetrics.REQUESTS).counters()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Префикс исключения берётся из настройки")
+    void excludePrefixComesFromConfiguration() {
+        var filter = new RequestMetricsFilter(new GatewayMetrics(registry), "/manage");
+
+        filter.filter(MockServerWebExchange.from(MockServerHttpRequest.get("/manage/prometheus")),
+                EMPTY_CHAIN).block();
+        filter.filter(routed(MockServerHttpRequest.get("/actuator/prometheus"), "catalog"),
+                EMPTY_CHAIN).block();
+
+        assertThat(registry.get(GatewayMetrics.REQUESTS)
+                .tag("endpoint", "catalog")
+                .counter().count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Пустой префикс исключения — ошибка, а не молча выключенные метрики")
+    void blankExcludePrefixIsRejected() {
+        assertThatThrownBy(() -> new RequestMetricsFilter(new GatewayMetrics(registry), ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("petstore.metrics.exclude-prefix");
     }
 }

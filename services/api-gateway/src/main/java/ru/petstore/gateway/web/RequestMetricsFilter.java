@@ -6,6 +6,7 @@ import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -23,16 +24,19 @@ public class RequestMetricsFilter implements WebFilter, Ordered {
 
     private final GatewayMetrics metrics;
 
-    private final String actuatorPrefix;
+    private final String excludePrefix;
 
-    public RequestMetricsFilter(GatewayMetrics metrics, String actuatorPrefix) {
+    public RequestMetricsFilter(GatewayMetrics metrics, String excludePrefix) {
+        if (!StringUtils.hasText(excludePrefix)) {
+            throw new IllegalArgumentException("petstore.metrics.exclude-prefix must not be blank");
+        }
         this.metrics = metrics;
-        this.actuatorPrefix = actuatorPrefix;
+        this.excludePrefix = excludePrefix;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        if (exchange.getRequest().getPath().value().startsWith(actuatorPrefix)) {
+        if (exchange.getRequest().getPath().value().startsWith(excludePrefix)) {
             return chain.filter(exchange);
         }
         long startedAt = System.nanoTime();

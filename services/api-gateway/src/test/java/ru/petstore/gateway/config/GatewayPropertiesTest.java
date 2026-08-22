@@ -33,7 +33,7 @@ class GatewayPropertiesTest {
     }
 
     @Test
-    @DisplayName("Нулевой предел частоты не даёт шлюзу подняться")
+    @DisplayName("Нулевой предел частоты не проходит валидацию свойств")
     void zeroRateLimitFailsTheStartup() {
         new ApplicationContextRunner()
                 .withUserConfiguration(PropertiesConfiguration.class)

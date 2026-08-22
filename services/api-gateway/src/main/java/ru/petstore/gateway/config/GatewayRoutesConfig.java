@@ -1,5 +1,7 @@
 package ru.petstore.gateway.config;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -10,26 +12,31 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class GatewayRoutesConfig {
 
-    private static final Map<String, List<String>> PATHS = Map.of(
-            "catalog", List.of("/api/v1/products/**",
-                    "/api/v1/categories/**",
-                    "/api/v1/species/**",
-                    "/api/v1/brands/**"),
-            "inventory", List.of("/api/v1/stock/**",
-                    "/api/v1/warehouses/**",
-                    "/api/v1/reservation-statuses/**"),
-            "customer", List.of("/api/v1/customers/**",
-                    "/api/v1/cities/**",
-                    "/api/v1/customer-statuses/**"),
-            "order", List.of("/api/v1/orders/**",
-                    "/api/v1/order-statuses/**",
-                    "/api/v1/delivery-types/**",
-                    "/api/v1/payment-methods/**"));
+    private static final Map<String, List<String>> PATHS = paths();
 
     private static final String API_DOCS_ROUTE_SUFFIX = "-api-docs";
 
     public static String apiDocsPath(String service) {
         return "/api-docs/" + service;
+    }
+
+    private static Map<String, List<String>> paths() {
+        Map<String, List<String>> paths = new LinkedHashMap<>();
+        paths.put("catalog", List.of("/api/v1/products/**",
+                "/api/v1/categories/**",
+                "/api/v1/species/**",
+                "/api/v1/brands/**"));
+        paths.put("inventory", List.of("/api/v1/stock/**",
+                "/api/v1/warehouses/**",
+                "/api/v1/reservation-statuses/**"));
+        paths.put("customer", List.of("/api/v1/customers/**",
+                "/api/v1/cities/**",
+                "/api/v1/customer-statuses/**"));
+        paths.put("order", List.of("/api/v1/orders/**",
+                "/api/v1/order-statuses/**",
+                "/api/v1/delivery-types/**",
+                "/api/v1/payment-methods/**"));
+        return Collections.unmodifiableMap(paths);
     }
 
     @Bean
