@@ -16,9 +16,6 @@ public class GatewayProperties {
 
     private final Map<String, URI> services = new LinkedHashMap<>();
 
-    @DurationMin(millis = 1)
-    private Duration healthTimeout = Duration.ofSeconds(1);
-
     @Valid
     private final RateLimit rateLimit = new RateLimit();
 
@@ -32,14 +29,6 @@ public class GatewayProperties {
             throw new IllegalStateException("petstore.gateway.services." + name + " is not configured");
         }
         return uri;
-    }
-
-    public Duration getHealthTimeout() {
-        return healthTimeout;
-    }
-
-    public void setHealthTimeout(Duration healthTimeout) {
-        this.healthTimeout = healthTimeout;
     }
 
     public RateLimit getRateLimit() {

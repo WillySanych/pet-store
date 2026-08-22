@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import io.github.resilience4j.ratelimiter.RateLimiter;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +93,7 @@ class OrderServiceTest {
         executor = new UpstreamExecutor();
         orderService = new OrderService(orderRepository, historyRepository, references, outbox,
                 catalogClient, inventoryClient, customerClient, executor,
-                new TransactionTemplate(transactionManager), RateLimiter.ofDefaults("test"));
+                new TransactionTemplate(transactionManager));
 
         lenient().when(references.statusItem(OrderStatusCode.NEW)).thenReturn(NEW_STATUS);
         lenient().when(references.statusItem(OrderStatusCode.CONFIRMED)).thenReturn(CONFIRMED_STATUS);

@@ -91,12 +91,6 @@ resilience4j:
         base-config: upstream
       customer:
         base-config: upstream
-  ratelimiter:
-    instances:
-      orders:
-        limit-for-period: ${ORDERS_RATE_LIMIT:200}
-        limit-refresh-period: 1s
-        timeout-duration: 0
 
 petstore:
   scheduler:

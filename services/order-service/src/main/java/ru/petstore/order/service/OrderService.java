@@ -1,6 +1,5 @@
 package ru.petstore.order.service;
 
-import io.github.resilience4j.ratelimiter.RateLimiter;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,7 +65,6 @@ public class OrderService {
     private final CustomerClient customerClient;
     private final UpstreamExecutor executor;
     private final TransactionTemplate transactionTemplate;
-    private final RateLimiter ordersRateLimiter;
 
     public OrderService(OrderRepository orderRepository,
                         OrderStatusHistoryRepository historyRepository,
@@ -76,8 +74,7 @@ public class OrderService {
                         InventoryClient inventoryClient,
                         CustomerClient customerClient,
                         UpstreamExecutor executor,
-                        TransactionTemplate transactionTemplate,
-                        RateLimiter ordersRateLimiter) {
+                        TransactionTemplate transactionTemplate) {
         this.orderRepository = orderRepository;
         this.historyRepository = historyRepository;
         this.references = references;
@@ -87,12 +84,11 @@ public class OrderService {
         this.customerClient = customerClient;
         this.executor = executor;
         this.transactionTemplate = transactionTemplate;
-        this.ordersRateLimiter = ordersRateLimiter;
     }
 
     public OrderCreation create(OrderRequest request, String idempotencyKey) {
         String key = idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim();
-        return ordersRateLimiter.executeSupplier(() -> place(request, key));
+        return place(request, key);
     }
 
     @Transactional(readOnly = true)

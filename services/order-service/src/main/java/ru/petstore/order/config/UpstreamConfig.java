@@ -1,8 +1,6 @@
 package ru.petstore.order.config;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.ratelimiter.RateLimiter;
-import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import java.net.http.HttpClient;
@@ -50,11 +48,6 @@ public class UpstreamConfig {
                                      TimeLimiterRegistry timeLimiters, UpstreamExecutor executor,
                                      ServiceMetrics metrics) {
         return upstreamCall(CustomerClient.UPSTREAM, retries, breakers, timeLimiters, executor, metrics);
-    }
-
-    @Bean
-    public RateLimiter ordersRateLimiter(RateLimiterRegistry registry) {
-        return registry.rateLimiter("orders");
     }
 
     @Bean

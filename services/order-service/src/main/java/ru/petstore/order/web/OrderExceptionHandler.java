@@ -1,6 +1,5 @@
 package ru.petstore.order.web;
 
-import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -59,16 +58,6 @@ public class OrderExceptionHandler {
         serviceMetrics.recordError("upstream_failed");
         log.error("Upstream {} answered with an error", e.getUpstream(), e);
         return body(HttpStatus.BAD_GATEWAY, "UPSTREAM_FAILED", e.getMessage());
-    }
-
-    @ExceptionHandler(RequestNotPermitted.class)
-    public ResponseEntity<ApiErrorResponse> handleRateLimited(RequestNotPermitted e) {
-        serviceMetrics.recordOverloadRejected("/api/v1/orders");
-        serviceMetrics.recordError("rate_limited");
-        log.warn("Order creation rejected by the rate limiter: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, GlobalExceptionHandler.RETRY_AFTER_SECONDS)
-                .body(ApiErrorResponse.of("RATE_LIMITED", "Too many orders, retry later", requestId()));
     }
 
     private ResponseEntity<ApiErrorResponse> body(HttpStatus status, String code, String message) {

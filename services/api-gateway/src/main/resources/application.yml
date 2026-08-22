@@ -24,8 +24,6 @@ management:
       probes:
         enabled: true
       show-details: always
-      cache:
-        time-to-live: 5s
   metrics:
     tags:
       service: ${spring.application.name}
