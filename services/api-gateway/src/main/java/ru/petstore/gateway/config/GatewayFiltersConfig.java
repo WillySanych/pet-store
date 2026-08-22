@@ -3,6 +3,7 @@ package ru.petstore.gateway.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,7 +18,8 @@ import ru.petstore.gateway.web.SemaphoreRateLimiter;
 @Configuration(proxyBeanMethods = false)
 public class GatewayFiltersConfig {
 
-    static final String TRACING_HEADER = "${petstore.tracing.header-name:X-Request-Id}";
+    static final String TRACING_HEADER =
+            "${petstore.tracing.header-name:" + RequestTracingFilter.REQUEST_ID_HEADER + "}";
 
     @Bean
     public GatewayMetrics gatewayMetrics(MeterRegistry meterRegistry) {
@@ -30,8 +32,8 @@ public class GatewayFiltersConfig {
     }
 
     @Bean
-    public RequestMetricsFilter requestMetricsFilter(GatewayMetrics metrics) {
-        return new RequestMetricsFilter(metrics);
+    public RequestMetricsFilter requestMetricsFilter(GatewayMetrics metrics, WebEndpointProperties endpoints) {
+        return new RequestMetricsFilter(metrics, endpoints.getBasePath());
     }
 
     @Configuration(proxyBeanMethods = false)

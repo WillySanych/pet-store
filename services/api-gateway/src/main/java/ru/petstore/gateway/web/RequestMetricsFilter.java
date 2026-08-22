@@ -21,17 +21,18 @@ public class RequestMetricsFilter implements WebFilter, Ordered {
     /** Nginx code for a request the client dropped before an answer: not a status the gateway can send. */
     static final int CLIENT_CLOSED_REQUEST = 499;
 
-    private static final String ACTUATOR_PREFIX = "/actuator";
-
     private final GatewayMetrics metrics;
 
-    public RequestMetricsFilter(GatewayMetrics metrics) {
+    private final String actuatorPrefix;
+
+    public RequestMetricsFilter(GatewayMetrics metrics, String actuatorPrefix) {
         this.metrics = metrics;
+        this.actuatorPrefix = actuatorPrefix;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        if (exchange.getRequest().getPath().value().startsWith(ACTUATOR_PREFIX)) {
+        if (exchange.getRequest().getPath().value().startsWith(actuatorPrefix)) {
             return chain.filter(exchange);
         }
         long startedAt = System.nanoTime();

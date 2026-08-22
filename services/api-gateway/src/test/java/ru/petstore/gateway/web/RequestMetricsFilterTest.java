@@ -1,17 +1,14 @@
 package ru.petstore.gateway.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static ru.petstore.gateway.web.RoutedExchanges.routed;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.net.URI;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.gateway.route.Route;
-import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import ru.petstore.gateway.metrics.GatewayMetrics;
@@ -22,22 +19,13 @@ class RequestMetricsFilterTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
-    private final RequestMetricsFilter filter = new RequestMetricsFilter(new GatewayMetrics(registry));
-
-    private static ServerWebExchange routedExchange(String path, String routeId) {
-        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path));
-        exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR, Route.async()
-                .id(routeId)
-                .uri(URI.create("http://localhost:8081"))
-                .predicate(ignored -> true)
-                .build());
-        return exchange;
-    }
+    private final RequestMetricsFilter filter =
+            new RequestMetricsFilter(new GatewayMetrics(registry), "/actuator");
 
     @Test
     @DisplayName("Запрос считается под меткой маршрута, а не URI")
     void requestIsCountedUnderTheRouteId() {
-        filter.filter(routedExchange("/api/v1/products/42", "catalog"), EMPTY_CHAIN).block();
+        filter.filter(routed(MockServerHttpRequest.get("/api/v1/products/42"), "catalog"), EMPTY_CHAIN).block();
 
         assertThat(registry.get(GatewayMetrics.REQUESTS)
                 .tag("endpoint", "catalog")
@@ -69,7 +57,7 @@ class RequestMetricsFilterTest {
     void failedRequestIsCountedAsServerError() {
         WebFilterChain failing = ignored -> Mono.error(new IllegalStateException("upstream is gone"));
 
-        filter.filter(routedExchange("/api/v1/products", "catalog"), failing)
+        filter.filter(routed(MockServerHttpRequest.get("/api/v1/products"), "catalog"), failing)
                 .onErrorResume(error -> Mono.empty())
                 .block();
 

@@ -47,8 +47,5 @@ petstore:
       inventory: ${INVENTORY_URL:http://localhost:8082}
       customer: ${CUSTOMER_URL:http://localhost:8083}
       order: ${ORDER_URL:http://localhost:8084}
-    health-timeout: PT1S
     rate-limit:
-      enabled: true
       limit-for-period: ${GATEWAY_RATE_LIMIT:500}
-      refresh-period: PT1S

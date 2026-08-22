@@ -1,16 +1,14 @@
 package ru.petstore.gateway.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static ru.petstore.gateway.web.RoutedExchanges.routed;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.route.Route;
-import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -36,14 +34,8 @@ class RateLimitFilterTest {
     }
 
     private static MockServerWebExchange orderExchange() {
-        var exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/api/v1/orders")
-                .header(RequestTracingFilter.REQUEST_ID_HEADER, REQUEST_ID));
-        exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR, Route.async()
-                .id("order")
-                .uri(URI.create("http://localhost:8084"))
-                .predicate(ignored -> true)
-                .build());
-        return exchange;
+        return routed(MockServerHttpRequest.post("/api/v1/orders")
+                .header(RequestTracingFilter.REQUEST_ID_HEADER, REQUEST_ID), "order");
     }
 
     @Test

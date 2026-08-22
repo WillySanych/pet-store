@@ -1,6 +1,7 @@
 package ru.petstore.gateway.web;
 
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.ServerWebExchange;
@@ -23,7 +24,7 @@ public class RequestTracingFilter implements WebFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String incoming = exchange.getRequest().getHeaders().getFirst(headerName);
-        String requestId = incoming == null || incoming.isBlank() ? UUID.randomUUID().toString() : incoming;
+        String requestId = incoming == null || incoming.isBlank() ? newRequestId() : incoming;
 
         ServerWebExchange traced = exchange.mutate()
                 .request(request -> request.headers(headers -> headers.set(headerName, requestId)))
@@ -36,6 +37,11 @@ public class RequestTracingFilter implements WebFilter, Ordered {
         });
 
         return chain.filter(traced).contextWrite(Context.of(MDC_KEY, requestId));
+    }
+
+    private static String newRequestId() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        return new UUID(random.nextLong(), random.nextLong()).toString();
     }
 
     @Override

@@ -20,10 +20,6 @@ public class SemaphoreRateLimiter {
         return permits.availablePermits();
     }
 
-    public int limitForPeriod() {
-        return limitForPeriod;
-    }
-
     public void refill() {
         int missing = limitForPeriod - permits.availablePermits();
         if (missing > 0) {

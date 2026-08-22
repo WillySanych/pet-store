@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.net.URI;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class GatewayPropertiesTest {
 
@@ -14,7 +17,7 @@ class GatewayPropertiesTest {
     void missingServiceAddressIsRejected() {
         var properties = new GatewayProperties();
 
-        assertThatThrownBy(() -> properties.service(GatewayRoutesConfig.CATALOG))
+        assertThatThrownBy(() -> properties.service("catalog"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("petstore.gateway.services.catalog");
     }
@@ -23,9 +26,23 @@ class GatewayPropertiesTest {
     @DisplayName("Заданный адрес отдаётся как есть")
     void configuredAddressIsReturned() {
         var properties = new GatewayProperties();
-        properties.getServices().put(GatewayRoutesConfig.CATALOG, URI.create("http://catalog-service:8081"));
+        properties.getServices().put("catalog", URI.create("http://catalog-service:8081"));
 
-        assertThat(properties.service(GatewayRoutesConfig.CATALOG))
+        assertThat(properties.service("catalog"))
                 .isEqualTo(URI.create("http://catalog-service:8081"));
+    }
+
+    @Test
+    @DisplayName("Нулевой предел частоты не даёт шлюзу подняться")
+    void zeroRateLimitFailsTheStartup() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("petstore.gateway.rate-limit.limit-for-period=0")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().rootCause().isInstanceOf(BindValidationException.class));
+    }
+
+    @EnableConfigurationProperties(GatewayProperties.class)
+    static class PropertiesConfiguration {
     }
 }

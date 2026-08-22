@@ -18,7 +18,6 @@ public class SwaggerUiConfig {
             urls.add(new SwaggerUrl(displayName, GatewayRoutesConfig.apiDocsPath(name), displayName));
         }
         swaggerUi.setUrls(urls);
-        properties.getServices().keySet().stream().findFirst()
-                .ifPresent(name -> swaggerUi.setUrlsPrimaryName(name + DISPLAY_SUFFIX));
+        urls.stream().findFirst().map(SwaggerUrl::getName).ifPresent(swaggerUi::setUrlsPrimaryName);
     }
 }
