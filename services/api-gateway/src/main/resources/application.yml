@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: api-gateway
+  reactor:
+    context-propagation: auto
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 2000
+            response-timeout: 5s
 
 management:
   endpoints:
@@ -15,6 +24,31 @@ management:
       probes:
         enabled: true
       show-details: always
+      cache:
+        time-to-live: 5s
   metrics:
     tags:
       service: ${spring.application.name}
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+petstore:
+  gateway:
+    services:
+      catalog: ${CATALOG_URL:http://localhost:8081}
+      inventory: ${INVENTORY_URL:http://localhost:8082}
+      customer: ${CUSTOMER_URL:http://localhost:8083}
+      order: ${ORDER_URL:http://localhost:8084}
+    health-timeout: PT1S
+    rate-limit:
+      enabled: true
+      limit-for-period: ${GATEWAY_RATE_LIMIT:500}
+      refresh-period: PT1S

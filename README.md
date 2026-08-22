@@ -114,3 +114,16 @@ mvn -pl services/order-service spring-boot:run
 Liquibase при старте.
 
 Демо-заказов нет: заказ создаётся через API на демо-данных каталога, склада и клиентов.
+
+### `api-gateway`
+
+```bash
+mvn -pl services/api-gateway spring-boot:run
+```
+
+Единая точка входа: 8080, маршруты на четыре сервиса, сквозной `X-Request-Id`, ограничение
+частоты запросов и сводный Swagger UI. Базы данных у шлюза нет.
+
+Адреса сервисов задаются переменными окружения `CATALOG_URL`, `INVENTORY_URL`, `CUSTOMER_URL`
+и `ORDER_URL` (по умолчанию `http://localhost:8081`…`8084`), предел частоты —
+`GATEWAY_RATE_LIMIT` (по умолчанию 500 запросов в секунду на экземпляр).
