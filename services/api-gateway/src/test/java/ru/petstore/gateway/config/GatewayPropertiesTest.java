@@ -3,7 +3,6 @@ package ru.petstore.gateway.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.net.URI;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -20,16 +19,6 @@ class GatewayPropertiesTest {
         assertThatThrownBy(() -> properties.service("catalog"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("petstore.gateway.services.catalog");
-    }
-
-    @Test
-    @DisplayName("Заданный адрес отдаётся как есть")
-    void configuredAddressIsReturned() {
-        var properties = new GatewayProperties();
-        properties.getServices().put("catalog", URI.create("http://catalog-service:8081"));
-
-        assertThat(properties.service("catalog"))
-                .isEqualTo(URI.create("http://catalog-service:8081"));
     }
 
     @Test

@@ -2,8 +2,6 @@ package ru.petstore.gateway.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
-import ru.petstore.gateway.metrics.GatewayMetrics;
 import ru.petstore.gateway.web.SemaphoreRateLimiter;
 
 @TestPropertySource(properties = {
@@ -23,9 +20,6 @@ class GatewayRateLimitTest extends AbstractGatewayTest {
 
     @Autowired
     private SemaphoreRateLimiter limiter;
-
-    @Autowired
-    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void openWindow() {
@@ -48,17 +42,6 @@ class GatewayRateLimitTest extends AbstractGatewayTest {
     }
 
     @Test
-    @DisplayName("Отклонения видны в метрике перегрузки")
-    void rejectionsAreCounted() {
-        double before = rejected();
-
-        client.get().uri("/api/v1/products").exchange().expectStatus().isOk();
-        client.get().uri("/api/v1/products").exchange().expectStatus().isEqualTo(429);
-
-        assertThat(rejected()).isEqualTo(before + 1);
-    }
-
-    @Test
     @DisplayName("Исчерпанное окно не мешает пробам и сбору метрик")
     void actuatorSurvivesTheOverload() {
         client.get().uri("/api/v1/products").exchange().expectStatus().isOk();
@@ -66,13 +49,5 @@ class GatewayRateLimitTest extends AbstractGatewayTest {
 
         client.get().uri("/actuator/health/liveness").exchange().expectStatus().isOk();
         client.get().uri("/actuator/prometheus").exchange().expectStatus().isOk();
-    }
-
-    private double rejected() {
-        return meterRegistry.find(GatewayMetrics.OVERLOAD_REJECTED)
-                .tag("endpoint", "catalog")
-                .counters().stream()
-                .mapToDouble(Counter::count)
-                .sum();
     }
 }

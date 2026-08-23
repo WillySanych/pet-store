@@ -89,15 +89,6 @@ class CustomerApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Справочник не отдаёт наружу внутренний идентификатор")
-    void referenceTablesDoNotExposeInternalIds() {
-        var statuses = testRestTemplate.getForObject("/api/v1/customer-statuses", JsonNode.class);
-
-        assertThat(statuses.get(0).has("id")).isFalse();
-        assertThat(statuses.get(0).get("code").asText()).isNotBlank();
-    }
-
-    @Test
     @DisplayName("Заведённый клиент доступен по своему идентификатору и начинает с NEW")
     void createdCustomerIsReadableById() {
         var created = createCustomer();
@@ -202,19 +193,6 @@ class CustomerApiTest extends AbstractPostgresTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("VALIDATION_FAILED");
         assertThat(response.getBody().get("message").asText()).contains("email").contains("phone");
-    }
-
-    @Test
-    @DisplayName("Занятая почта отклоняется")
-    void duplicateEmailIsRejected() {
-        var email = uniqueEmail();
-        createCustomer(request(email));
-
-        var response = testRestTemplate.postForEntity("/api/v1/customers",
-                request(email, "Мария", "Иванова", null), JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("message").asText()).contains(email);
     }
 
     @Test

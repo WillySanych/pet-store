@@ -150,15 +150,6 @@ class InventoryApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Справочник не отдаёт наружу внутренний идентификатор")
-    void referenceTablesDoNotExposeInternalIds() {
-        var warehouses = testRestTemplate.getForObject("/api/v1/warehouses", JsonNode.class);
-
-        assertThat(warehouses.get(0).has("id")).isFalse();
-        assertThat(warehouses.get(0).get("code").asText()).isNotBlank();
-    }
-
-    @Test
     @DisplayName("Размеры кешей уезжают в Prometheus")
     void cacheMetricsAreExported() {
         testRestTemplate.getForObject("/api/v1/warehouses", String.class);

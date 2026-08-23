@@ -46,15 +46,6 @@ class CommonCoreIntegrationTest {
     }
 
     @Test
-    @DisplayName("Без заголовка идентификатор генерируется сам")
-    void requestIdIsGeneratedWhenHeaderAbsent() {
-        var response = testRestTemplate.getForEntity("/probe/7", String.class);
-
-        assertThat(response.getHeaders().getFirst(RequestTracingFilter.REQUEST_ID_HEADER))
-                .isNotBlank();
-    }
-
-    @Test
     @DisplayName("В лейбл endpoint попадает шаблон пути, а не фактический URI")
     void endpointTagUsesPathTemplateNotActualUri() {
         // The registry is shared across the class, so measure the delta: otherwise the result

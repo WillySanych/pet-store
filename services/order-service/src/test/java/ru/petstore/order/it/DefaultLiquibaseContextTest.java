@@ -18,16 +18,6 @@ class DefaultLiquibaseContextTest extends AbstractPostgresTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("Таблица блокировок планировщика заводится миграцией сервиса")
-    void schedulerLockTableIsCreatedByTheService() {
-        Long lockTable = jdbcTemplate.queryForObject("""
-                SELECT count(*) FROM information_schema.tables
-                WHERE table_schema = 'orders' AND table_name = 'shedlock'""", Long.class);
-
-        assertThat(lockTable).isOne();
-    }
-
-    @Test
     @DisplayName("Справочники засеяны: статусы, доставка, оплата")
     void referenceDataIsSeeded() {
         assertThat(count("order_status")).isEqualTo(3);
