@@ -1,0 +1,16 @@
+Релиз {{ .Release.Name }} установлен в namespace {{ .Release.Namespace }}.
+
+Поды:
+  kubectl get pods -n {{ .Release.Namespace }} -w
+
+Шлюз (Docker Desktop публикует LoadBalancer на localhost):
+  http://localhost:8080/swagger-ui.html
+  иначе: kubectl port-forward -n {{ .Release.Namespace }} svc/api-gateway 8080:8080
+
+Grafana и Prometheus:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/grafana 3000:3000
+  kubectl port-forward -n {{ .Release.Namespace }} svc/prometheus 9090:9090
+
+Дашборды берутся из ConfigMap {{ index .Values "petstore-infra" "grafana" "dashboardsConfigMap" | default "petstore-dashboards" }}:
+  kubectl create configmap petstore-dashboards -n {{ .Release.Namespace }} \
+    --from-file=deploy/grafana/dashboards --dry-run=client -o yaml | kubectl apply -f -

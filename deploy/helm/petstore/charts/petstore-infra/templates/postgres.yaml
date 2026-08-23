@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: petstore-db
+  labels: {{- include "infra.labels" "postgres" | nindent 4 }}
+type: Opaque
+stringData:
+  DB_NAME: {{ .Values.database.name | quote }}
+  DB_USER: {{ .Values.database.username | quote }}
+  DB_PASSWORD: {{ .Values.database.password | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels: {{- include "infra.labels" "postgres" | nindent 4 }}
+data:
+  01-schemas.sql: |
+    CREATE SCHEMA IF NOT EXISTS catalog      AUTHORIZATION {{ .Values.database.username }};
+    CREATE SCHEMA IF NOT EXISTS inventory    AUTHORIZATION {{ .Values.database.username }};
+    CREATE SCHEMA IF NOT EXISTS customer     AUTHORIZATION {{ .Values.database.username }};
+    CREATE SCHEMA IF NOT EXISTS orders       AUTHORIZATION {{ .Values.database.username }};
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels: {{- include "infra.labels" "postgres" | nindent 4 }}
+spec:
+  selector: {{- include "infra.selectorLabels" "postgres" | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: {{- include "infra.labels" "postgres" | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: {{- include "infra.selectorLabels" "postgres" | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "infra.labels" "postgres" | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-db
+                  key: DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-db
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-db
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.database.username }}", "-d", "{{ .Values.database.name }}", "-h", "127.0.0.1"]
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.database.username }}", "-d", "{{ .Values.database.name }}", "-h", "127.0.0.1"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}

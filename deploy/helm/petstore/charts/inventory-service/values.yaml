@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: petstore/inventory-service
+  pullPolicy: IfNotPresent
+
+ports:
+  - name: http
+    port: 8082
+  - name: grpc
+    port: 9102
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  className: ""
+  host: petstore.localhost
+  path: /
+
+database:
+  enabled: true
+  secretName: petstore-db
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+env:
+  JAVA_OPTS: "-Xmx512m"
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  KAFKA_BOOTSTRAP: kafka:9092
+  LIQUIBASE_CONTEXTS: default

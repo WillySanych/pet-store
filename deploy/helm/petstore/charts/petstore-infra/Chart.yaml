@@ -1,0 +1,6 @@
+apiVersion: v2
+name: petstore-infra
+description: PostgreSQL, Kafka, Prometheus и Grafana для кластера petstore
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

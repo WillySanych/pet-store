@@ -1,0 +1,20 @@
+apiVersion: v2
+name: petstore
+description: Онлайн-зоомагазин целиком — инфраструктура и пять сервисов
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+dependencies:
+  - name: petstore-infra
+    version: "0.1.0"
+  - name: catalog-service
+    version: "0.1.0"
+  - name: inventory-service
+    version: "0.1.0"
+  - name: customer-service
+    version: "0.1.0"
+  - name: order-service
+    version: "0.1.0"
+  - name: api-gateway
+    version: "0.1.0"

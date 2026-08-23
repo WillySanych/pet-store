@@ -1,0 +1,22 @@
+database:
+  name: petstore
+  username: petstore
+  password: petstore
+
+postgres:
+  image: postgres:16.14
+  storage: 2Gi
+
+kafka:
+  image: apache/kafka:4.3.1
+  storage: 2Gi
+
+prometheus:
+  image: prom/prometheus:v3.13.2
+  retention: 6h
+
+grafana:
+  image: grafana/grafana:13.0.6
+  adminUser: admin
+  adminPassword: admin
+  dashboardsConfigMap: petstore-dashboards

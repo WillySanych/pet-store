@@ -1,0 +1,6 @@
+apiVersion: v2
+name: customer-service
+description: Клиенты и адреса доставки
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -18,7 +18,8 @@
 
 ## Требования
 
-Java 21, Maven 3.9+, Docker с Compose v2+, Kubernetes, Docker и Helm.
+Java 21, Maven 3.9+, Docker с Compose v2+; для развёртывания в кластере — Kubernetes
+(в проекте это Kubernetes от Docker Desktop) и Helm (чарты проверены на 4.2).
 
 ## Сборка
 
@@ -128,12 +129,96 @@ mvn -pl services/api-gateway spring-boot:run
 и `ORDER_URL` (по умолчанию `http://localhost:8081`…`8084`), предел частоты —
 `GATEWAY_RATE_LIMIT` (по умолчанию 500 запросов в секунду на экземпляр).
 
+## Запуск в Docker
+
+Образ у всех пяти сервисов собирается одним многоступенчатым `Dockerfile` в корне репозитория:
+имя модуля передаётся аргументом `SERVICE`, первая ступень (`maven:3.9.11-eclipse-temurin-21`)
+собирает jar командой `mvn -pl services/${SERVICE} -am -DskipTests package`, вторая
+(`eclipse-temurin:21-jre`) получает только jar и запускает его от непривилегированного
+`1001:1001` — заводить для этого пользователя в `/etc/passwd` не требуется. Тесты в образе
+пропускаются намеренно: интеграционным нужен Testcontainers, то есть Docker внутри сборки, —
+они проходят раньше, в `mvn install`.
+
+Контекст сборки — корень репозитория (реактор корневого pom читает все модули), а аргумент
+сборки compose подставляет сам, поэтому проще собирать через него:
+
+```bash
+docker compose -f deploy/docker-compose.yml --profile apps build
+```
+
+Получаются образы `petstore/<сервис>:0.1.0` — те же, что ожидают Helm-чарты: Docker Desktop
+отдаёт кластеру тот же демон, отдельной сборки для Kubernetes не нужно.
+
+Инфраструктура вместе с сервисами:
+
+```bash
+docker compose -f deploy/docker-compose.yml --profile apps up -d
+```
+
+Без `--profile apps` поднимается только инфраструктура — этот режим нужен для `spring-boot:run`
+из IDEA и для тестов, поэтому он и остался поведением по умолчанию. Порты снаружи те же,
+что при запуске на хосте, так что Prometheus собирает метрики одними и теми же таргетами
+`host.docker.internal:8080…8084` в обоих режимах.
+
+Демо-данные и JVM-флаги передаются переменными окружения самой команды:
+
+```bash
+LIQUIBASE_CONTEXTS=demo docker compose -f deploy/docker-compose.yml --profile apps up -d
+JAVA_OPTS="-XX:+UseZGC -Xmx512m" docker compose -f deploy/docker-compose.yml --profile apps up -d
+```
+
+## Запуск в Kubernetes
+
+Кластер — Kubernetes от Docker Desktop. Umbrella-чарт `deploy/helm/petstore` держит шесть
+подчартов в `deploy/helm/petstore/charts/`: `petstore-infra` (PostgreSQL, Kafka, Prometheus,
+Grafana) и по чарту на каждый сервис. Образы должны быть собраны локально — в чартах стоит
+`imagePullPolicy: IfNotPresent`, в реестр ничего не пушится.
+
+```bash
+kubectl create namespace petstore
+kubectl create configmap petstore-dashboards -n petstore --from-file=deploy/grafana/dashboards
+helm upgrade --install petstore deploy/helm/petstore -n petstore
+kubectl get pods -n petstore -w
+```
+
+ConfigMap с дашбордами создаётся отдельной командой, потому что единственная их копия лежит
+в `deploy/grafana/dashboards/` — за пределами чарта, а Helm читает файлы только из своего
+каталога. Без неё Grafana всё равно поднимется, только без дашбордов.
+
+| Куда смотреть | Как добраться |
+|---|---|
+| Шлюз, Swagger UI | http://localhost:8080/swagger-ui.html — Docker Desktop публикует `LoadBalancer` на localhost |
+| Grafana | `kubectl port-forward -n petstore svc/grafana 3000:3000` |
+| Prometheus | `kubectl port-forward -n petstore svc/prometheus 9090:9090` |
+
+Объект `Ingress` на шлюз чарт создаёт (`petstore.localhost`), но в Docker Desktop нет
+ingress-контроллера: чтобы он заработал, нужно поставить, например, ingress-nginx. Пока его нет,
+вход — через `LoadBalancer` на 8080.
+
+Реплики меняются вручную, автомасштабирования нет (почему — в `plan.md`):
+
+```bash
+kubectl scale deployment/catalog-service -n petstore --replicas=3
+```
+
+Демо-данные — `LIQUIBASE_CONTEXTS` в values всех четырёх сервисов с базой:
+
+```bash
+helm upgrade --install petstore deploy/helm/petstore -n petstore \
+  --set catalog-service.env.LIQUIBASE_CONTEXTS=demo \
+  --set inventory-service.env.LIQUIBASE_CONTEXTS=demo \
+  --set customer-service.env.LIQUIBASE_CONTEXTS=demo
+```
+
+Снести релиз: `helm uninstall petstore -n petstore`. Тома PostgreSQL и Kafka переживают удаление
+релиза — `kubectl delete pvc -n petstore --all`, если нужна чистая база.
+
 ## Метрики и дашборды
 
 Каждый сервис отдаёт метрики на `/actuator/prometheus`. Prometheus из `docker-compose` собирает их
-статическими таргетами `host.docker.internal:8080`…`8084`, то есть с процессов, запущенных
-на хосте через `spring-boot:run` или `java -jar`. Живы ли все пять целей, видно
-на http://localhost:9090/targets.
+статическими таргетами `host.docker.internal:8080`…`8084`. Адрес один на оба режима: он ведёт
+на хост, а туда published-портами выходят и процессы, запущенные через `spring-boot:run`,
+и контейнеры профиля `apps`. Живы ли все пять целей, видно на http://localhost:9090/targets.
 
 Grafana поднимается уже настроенной: `deploy/grafana/provisioning/` заводит источник данных
 и папку `PetStore`, дашборды берутся из `deploy/grafana/dashboards/`.
@@ -149,8 +234,9 @@ Grafana поднимается уже настроенной: `deploy/grafana/pr
 хотя бы раз: Micrometer заводит счётчик на первом инкременте, до этого метрики нет в выдаче
 `/actuator/prometheus`. Это не поломка дашборда.
 
-В Kubernetes используется второй конфиг — `deploy/prometheus/prometheus-k8s.yml`: адреса подов
-известны только service discovery, поэтому таргеты берутся из `kubernetes_sd_configs`, а поды
-отбираются по аннотациям `prometheus.io/scrape`, `prometheus.io/path` и `prometheus.io/port`.
+В Kubernetes работает второй конфиг — он нужен только кластеру, поэтому и лежит в чарте:
+`deploy/helm/petstore/charts/petstore-infra/files/prometheus.yml`. Адреса подов известны только
+service discovery, поэтому таргеты берутся из `kubernetes_sd_configs`, а поды отбираются
+по аннотациям `prometheus.io/scrape`, `prometheus.io/path` и `prometheus.io/port`.
 Relabeling кладёт имя пода в `instance`, поэтому панели с разбивкой по экземплярам одинаково
 работают и в compose, и в кластере.

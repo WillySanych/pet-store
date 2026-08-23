@@ -1,0 +1,38 @@
+replicaCount: 1
+
+image:
+  repository: petstore/api-gateway
+  pullPolicy: IfNotPresent
+
+ports:
+  - name: http
+    port: 8080
+
+service:
+  type: LoadBalancer
+
+ingress:
+  enabled: true
+  className: ""
+  host: petstore.localhost
+  path: /
+
+database:
+  enabled: false
+  secretName: petstore-db
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+env:
+  JAVA_OPTS: "-Xmx256m"
+  CATALOG_URL: http://catalog-service:8081
+  INVENTORY_URL: http://inventory-service:8082
+  CUSTOMER_URL: http://customer-service:8083
+  ORDER_URL: http://order-service:8084
+  GATEWAY_RATE_LIMIT: "500"
