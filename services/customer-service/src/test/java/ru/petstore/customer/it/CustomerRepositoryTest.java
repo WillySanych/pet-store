@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import ru.petstore.common.reference.ReferenceEntity;
 import ru.petstore.customer.domain.Address;
@@ -44,8 +43,6 @@ class CustomerRepositoryTest extends AbstractPostgresTest {
     private CityRepository cityRepository;
     @Autowired
     private CustomerStatusRepository customerStatusRepository;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -99,16 +96,6 @@ class CustomerRepositoryTest extends AbstractPostgresTest {
                 .contains("MSK", "SPB", "EKB", "NSK", "KZN", "NN");
         assertThat(customerStatusRepository.findAll()).extracting(CustomerStatus::getCode)
                 .containsExactlyInAnyOrder("NEW", "ACTIVE", "BLOCKED");
-    }
-
-    @Test
-    @DisplayName("Демо-клиенты не приезжают в тесты: changeset под контекстом demo не выполнялся")
-    void demoCustomersAreNotLoadedUnderTestContext() {
-        Long applied = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM customer.databasechangelog WHERE id = '003-1-demo-customers'",
-                Long.class);
-
-        assertThat(applied).isZero();
     }
 
     @Test

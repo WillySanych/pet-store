@@ -29,28 +29,23 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Bulkhead входящих запросов. Без стартера resilience4j-spring-boot3: тот тянет AOP
-             и всё семейство, а нужен один компонент. -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-bulkhead</artifactId>
         </dependency>
 
-        <!-- Только аннотации Swagger для общих DTO: сам springdoc приносит сервис. -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-common</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Только Page для общего PageResponse. -->
         <dependency>
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-commons</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Только аннотации: общий @MappedSuperclass справочников. Провайдер приносит сервис. -->
         <dependency>
             <groupId>jakarta.persistence</groupId>
             <artifactId>jakarta.persistence-api</artifactId>

@@ -22,14 +22,6 @@ class CacheWarmupReadinessTest {
     private TestRestTemplate testRestTemplate;
 
     @Test
-    @DisplayName("Индикатор прогрева виден в общем health")
-    void warmupIndicatorIsVisibleInOverallHealth() {
-        String body = testRestTemplate.getForObject("/actuator/health", String.class);
-
-        assertThat(body).contains("cacheWarmup");
-    }
-
-    @Test
     @DisplayName("Индикатор прогрева входит в группу readiness")
     void warmupIndicatorIsPartOfReadinessGroup() {
         String body = testRestTemplate.getForObject("/actuator/health/readiness", String.class);

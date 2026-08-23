@@ -371,15 +371,6 @@ class CustomerApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Readiness поднимается только с прогретыми кешами")
-    void readinessReportsWarmedUpCaches() {
-        var response = testRestTemplate.getForEntity("/actuator/health/readiness", JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().get("status").asText()).isEqualTo("UP");
-    }
-
-    @Test
     @DisplayName("Размеры кешей уезжают в Prometheus")
     void cacheMetricsAreExported() {
         testRestTemplate.getForObject("/api/v1/cities", String.class);

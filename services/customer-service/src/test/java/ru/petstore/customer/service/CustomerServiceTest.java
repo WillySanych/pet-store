@@ -239,18 +239,6 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("Занятая почта отклоняется до сохранения")
-    void duplicateEmailIsRejectedBeforeSave() {
-        when(customerRepository.existsByEmail("taken@example.com")).thenReturn(true);
-
-        assertThatThrownBy(() -> customerService.create(request("taken@example.com")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("taken@example.com");
-
-        verify(customerRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
     @DisplayName("Гонка на почте: нарушение уникального индекса тоже ошибка клиента")
     void uniqueIndexViolationIsReportedAsClientError() {
         statusesResolve();

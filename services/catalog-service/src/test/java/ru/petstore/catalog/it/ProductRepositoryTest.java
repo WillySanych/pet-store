@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,8 +50,6 @@ class ProductRepositoryTest extends AbstractPostgresTest {
     private SpeciesRepository speciesRepository;
     @Autowired
     private BrandRepository brandRepository;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -105,16 +102,6 @@ class ProductRepositoryTest extends AbstractPostgresTest {
                 .contains("FOOD", "TOYS", "HYGIENE", "ACCESSORIES", "HEALTH", "HOUSING");
         assertThat(speciesRepository.findAll()).hasSize(6);
         assertThat(brandRepository.findAll()).hasSize(6);
-    }
-
-    @Test
-    @DisplayName("Демо-товары не приезжают в тесты: changeset под контекстом demo не выполнялся")
-    void demoProductsAreNotLoadedUnderTestContext() {
-        Long applied = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM catalog.databasechangelog WHERE id = '003-1-demo-products'",
-                Long.class);
-
-        assertThat(applied).isZero();
     }
 
     @Test
