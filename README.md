@@ -127,3 +127,30 @@ mvn -pl services/api-gateway spring-boot:run
 Адреса сервисов задаются переменными окружения `CATALOG_URL`, `INVENTORY_URL`, `CUSTOMER_URL`
 и `ORDER_URL` (по умолчанию `http://localhost:8081`…`8084`), предел частоты —
 `GATEWAY_RATE_LIMIT` (по умолчанию 500 запросов в секунду на экземпляр).
+
+## Метрики и дашборды
+
+Каждый сервис отдаёт метрики на `/actuator/prometheus`. Prometheus из `docker-compose` собирает их
+статическими таргетами `host.docker.internal:8080`…`8084`, то есть с процессов, запущенных
+на хосте через `spring-boot:run` или `java -jar`. Живы ли все пять целей, видно
+на http://localhost:9090/targets.
+
+Grafana поднимается уже настроенной: `deploy/grafana/provisioning/` заводит источник данных
+и папку `PetStore`, дашборды берутся из `deploy/grafana/dashboards/`.
+
+| Дашборд | Что показывает |
+|---|---|
+| **Service Overview** — http://localhost:3000/d/petstore-overview | запросы в секунду, доля неуспешных ответов, перцентили p50/p95/p99, коды ответов, разбивка по экземплярам, таблица самых нагруженных эндпоинтов |
+| **Application Internals** — http://localhost:3000/d/petstore-internals | размеры справочных кешей и доля попаданий, ошибки по типам, повторы к апстримам и состояние circuit breaker, отказы по перегрузке, heap, паузы GC и потоки |
+
+Сверху у обоих переключатель источника данных и мультиселект сервисов.
+
+Панели «Повторы и отказы апстримов» и «Отказы по перегрузке» пусты, пока событие не случилось
+хотя бы раз: Micrometer заводит счётчик на первом инкременте, до этого метрики нет в выдаче
+`/actuator/prometheus`. Это не поломка дашборда.
+
+В Kubernetes используется второй конфиг — `deploy/prometheus/prometheus-k8s.yml`: адреса подов
+известны только service discovery, поэтому таргеты берутся из `kubernetes_sd_configs`, а поды
+отбираются по аннотациям `prometheus.io/scrape`, `prometheus.io/path` и `prometheus.io/port`.
+Relabeling кладёт имя пода в `instance`, поэтому панели с разбивкой по экземплярам одинаково
+работают и в compose, и в кластере.
