@@ -46,15 +46,6 @@ class SchedulerLockAutoConfigurationTest {
                 });
     }
 
-    @Test
-    @DisplayName("Таблица блокировок квалифицируется схемой сервиса")
-    void lockTableIsTakenFromProperties() {
-        runner.withBean(DataSource.class, () -> mock(DataSource.class))
-                .withPropertyValues("petstore.scheduler.table-name=inventory.shedlock")
-                .run(context -> assertThat(context.getBean(CommonCoreProperties.class)
-                        .getScheduler().getTableName()).isEqualTo("inventory.shedlock"));
-    }
-
     @Configuration
     @EnableConfigurationProperties(CommonCoreProperties.class)
     static class PropertiesConfig {

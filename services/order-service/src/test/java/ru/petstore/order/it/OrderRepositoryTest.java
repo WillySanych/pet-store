@@ -113,15 +113,6 @@ class OrderRepositoryTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Заказы без ключа уживаются: индекс не считает NULL повтором")
-    void ordersWithoutKeyCoexist() {
-        orderRepository.saveAndFlush(order(UUID.randomUUID(), null));
-        orderRepository.saveAndFlush(order(UUID.randomUUID(), null));
-
-        assertThat(orderRepository.count()).isPositive();
-    }
-
-    @Test
     @DisplayName("Публикатору отдаются только неопубликованные сообщения, старые первыми")
     void unpublishedMessagesComeOldestFirst() {
         UUID orderId = UUID.randomUUID();

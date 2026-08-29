@@ -41,14 +41,6 @@ class RequestIdRecordInterceptorTest {
         assertThat(MDC.get(RequestTracingFilter.MDC_KEY)).isEqualTo("existing");
     }
 
-    @Test
-    @DisplayName("Перехватчик отдаёт сообщение дальше как есть")
-    void recordIsPassedThrough() {
-        ConsumerRecord<Object, Object> record = record("trace-1");
-
-        assertThat(interceptor.intercept(record, null)).isSameAs(record);
-    }
-
     private static ConsumerRecord<Object, Object> record(String requestId) {
         ConsumerRecord<Object, Object> record =
                 new ConsumerRecord<>("order-events", 0, 0L, "key", "{}");

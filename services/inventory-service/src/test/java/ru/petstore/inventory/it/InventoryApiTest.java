@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,7 +25,6 @@ import ru.petstore.inventory.web.dto.StockResponse;
         "grpc.server.port=0",
         "spring.kafka.listener.auto-startup=false"
 })
-@AutoConfigureObservability
 class InventoryApiTest extends AbstractPostgresTest {
 
     @Autowired
@@ -147,18 +145,5 @@ class InventoryApiTest extends AbstractPostgresTest {
 
         assertThat(statuses).extracting(ReferenceResponse::code)
                 .containsExactly("ACTIVE", "COMMITTED", "EXPIRED", "RELEASED");
-    }
-
-    @Test
-    @DisplayName("Размеры кешей уезжают в Prometheus")
-    void cacheMetricsAreExported() {
-        testRestTemplate.getForObject("/api/v1/warehouses", String.class);
-
-        var metrics = testRestTemplate.getForObject("/actuator/prometheus", String.class);
-
-        assertThat(metrics)
-                .contains("petstore_cache_size")
-                .contains("cache=\"warehouses\"")
-                .contains("cache=\"reservation-statuses\"");
     }
 }

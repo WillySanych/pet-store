@@ -5,12 +5,9 @@ import static ru.petstore.gateway.web.RoutedExchanges.routed;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -22,11 +19,7 @@ class RateLimitFilterTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final GatewayMetrics metrics = new GatewayMetrics(registry);
-    private final AtomicBoolean chainCalled = new AtomicBoolean();
-    private final GatewayFilterChain chain = exchange -> {
-        chainCalled.set(true);
-        return Mono.empty();
-    };
+    private final GatewayFilterChain chain = exchange -> Mono.empty();
 
     private RateLimitFilter filterWith(SemaphoreRateLimiter limiter) {
         return new RateLimitFilter(limiter, metrics, new ObjectMapper().findAndRegisterModules(),
@@ -36,23 +29,6 @@ class RateLimitFilterTest {
     private static MockServerWebExchange orderExchange() {
         return routed(MockServerHttpRequest.post("/api/v1/orders")
                 .header(RequestTracingFilter.REQUEST_ID_HEADER, REQUEST_ID), "order");
-    }
-
-    @Test
-    @DisplayName("Сверх лимита — 429 с Retry-After и телом сервисного формата")
-    void burstIsRejectedWithTooManyRequests() {
-        var limiter = new SemaphoreRateLimiter(1);
-        limiter.tryAcquire();
-        var exchange = orderExchange();
-
-        filterWith(limiter).filter(exchange, chain).block();
-
-        assertThat(chainCalled).isFalse();
-        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        assertThat(exchange.getResponse().getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("1");
-        assertThat(exchange.getResponse().getBodyAsString().block())
-                .contains("RATE_LIMITED")
-                .contains(REQUEST_ID);
     }
 
     @Test

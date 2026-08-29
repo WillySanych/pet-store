@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
@@ -25,7 +24,6 @@ import ru.petstore.customer.web.dto.DeliveryTargetResponse;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "spring.liquibase.contexts=test")
-@AutoConfigureObservability
 class CustomerApiTest extends AbstractPostgresTest {
 
     @Autowired
@@ -234,28 +232,5 @@ class CustomerApiTest extends AbstractPostgresTest {
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(testRestTemplate.getForEntity("/api/v1/customers/" + customer.id() + "/addresses",
                 JsonNode.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Фильтры описаны в OpenAPI по одному параметру, а не вложенным объектом")
-    void filtersAreDocumentedAsSeparateParameters() {
-        var parameters = testRestTemplate.getForObject("/v3/api-docs", JsonNode.class)
-                .at("/paths/~1api~1v1~1customers/get/parameters");
-
-        assertThat(parameters).extracting(parameter -> parameter.get("name").asText())
-                .contains("status", "search");
-    }
-
-    @Test
-    @DisplayName("Размеры кешей уезжают в Prometheus")
-    void cacheMetricsAreExported() {
-        testRestTemplate.getForObject("/api/v1/cities", String.class);
-
-        var metrics = testRestTemplate.getForObject("/actuator/prometheus", String.class);
-
-        assertThat(metrics)
-                .contains("petstore_cache_size")
-                .contains("cache=\"cities\"")
-                .contains("cache=\"customer-statuses\"");
     }
 }

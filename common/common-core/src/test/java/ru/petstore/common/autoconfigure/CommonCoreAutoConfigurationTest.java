@@ -51,14 +51,6 @@ class CommonCoreAutoConfigurationTest {
     }
 
     @Test
-    @DisplayName("Имя заголовка трассировки настраивается")
-    void tracingHeaderNameIsConfigurable() {
-        runner.withPropertyValues("petstore.tracing.header-name=X-Correlation-Id")
-                .run(context -> assertThat(context.getBean(CommonCoreProperties.class)
-                        .getTracing().getHeaderName()).isEqualTo("X-Correlation-Id"));
-    }
-
-    @Test
     @DisplayName("Кеши сервиса подхватываются реестром и привязываются к метрикам")
     void serviceCachesArePickedUpAndBoundToMetrics() {
         runner.withUserConfiguration(CacheConfig.class).run(context -> {

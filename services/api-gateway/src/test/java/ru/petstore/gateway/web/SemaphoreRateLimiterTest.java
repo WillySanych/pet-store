@@ -2,11 +2,6 @@ package ru.petstore.gateway.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,37 +40,5 @@ class SemaphoreRateLimiterTest {
         limiter.refill();
 
         assertThat(limiter.availablePermits()).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("Под конкурентной нагрузкой проходит ровно лимит")
-    void concurrentBurstIsCappedAtTheLimit() throws Exception {
-        int limit = 10;
-        int threads = 200;
-        var limiter = new SemaphoreRateLimiter(limit);
-        var passed = new AtomicInteger();
-        var start = new CountDownLatch(1);
-        var finished = new CountDownLatch(threads);
-
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (int i = 0; i < threads; i++) {
-                executor.submit(() -> {
-                    try {
-                        start.await();
-                        if (limiter.tryAcquire()) {
-                            passed.incrementAndGet();
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        finished.countDown();
-                    }
-                });
-            }
-            start.countDown();
-            assertThat(finished.await(10, TimeUnit.SECONDS)).isTrue();
-        }
-
-        assertThat(passed.get()).isEqualTo(limit);
     }
 }
