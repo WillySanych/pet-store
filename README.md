@@ -63,8 +63,9 @@ mvn -pl services/catalog-service spring-boot:run
 (`category`, `species`, `brand`) заводит в ней Liquibase при старте сервиса, поэтому
 инфраструктура из `docker-compose` должна быть поднята.
 
-Двенадцать демо-товаров лежат под контекстом `demo` и по умолчанию **не** добавляются —
-скрипт на их добавление находится в отдельном контексте: `LIQUIBASE_CONTEXTS=demo`.
+Демо-каталог лежит под контекстом `demo` и по умолчанию **не** добавляется: двенадцать
+именованных товаров плюс однотипный хвост до ста двадцати позиций, по которому листают
+страницы нагрузочные сценарии. Включается контекстом: `LIQUIBASE_CONTEXTS=demo`.
 
 ### `inventory-service`
 
@@ -76,7 +77,7 @@ mvn -pl services/inventory-service spring-boot:run
 топика `order-events`. Таблицы схемы `inventory` и справочники (`warehouse`, `reservation_status`)
 заводит Liquibase при старте, поэтому инфраструктура из `docker-compose` должна быть поднята.
 
-Демо-остатки на те же двенадцать товаров каталога — тоже под контекстом `demo`:
+Демо-остатки на все сто двадцать товаров каталога — тоже под контекстом `demo`:
 `LIQUIBASE_CONTEXTS=demo` в обоих сервисах даёт каталог, который можно заказать.
 
 Остаток списывается **только** по событию `ORDER_CONFIRMED` из Kafka. Топик `order-events` заводит
@@ -102,7 +103,7 @@ mvn -pl services/customer-service spring-boot:run
 основного. Заблокированному клиенту сервис не отказывает — статус едет в ответе, решение
 за вызывающим.
 
-Три демо-клиента с адресами — под контекстом `demo`: `LIQUIBASE_CONTEXTS=demo`.
+Двадцать четыре демо-клиента с адресами — под контекстом `demo`: `LIQUIBASE_CONTEXTS=demo`.
 
 ### `order-service`
 
@@ -134,20 +135,15 @@ mvn -pl services/api-gateway spring-boot:run
 Образ у всех пяти сервисов собирается одним многоступенчатым `Dockerfile` в корне репозитория:
 имя модуля передаётся аргументом `SERVICE`, первая ступень (`maven:3.9.11-eclipse-temurin-21`)
 собирает jar командой `mvn -pl services/${SERVICE} -am -DskipTests package`, вторая
-(`eclipse-temurin:21-jre`) получает только jar и запускает его от непривилегированного
-`1001:1001` — заводить для этого пользователя в `/etc/passwd` не требуется. Тесты в образе
+(`eclipse-temurin:21-jre`) получает только jar и запускает его. Тесты в образе
 пропускаются намеренно: интеграционным нужен Testcontainers, то есть Docker внутри сборки, —
 они проходят раньше, в `mvn install`.
 
-Контекст сборки — корень репозитория (реактор корневого pom читает все модули), а аргумент
-сборки compose подставляет сам, поэтому проще собирать через него:
+Команда для сборки:
 
 ```bash
 docker compose -f deploy/docker-compose.yml --profile apps build
 ```
-
-Получаются образы `petstore/<сервис>:0.1.0` — те же, что ожидают Helm-чарты: Docker Desktop
-отдаёт кластеру тот же демон, отдельной сборки для Kubernetes не нужно.
 
 Инфраструктура вместе с сервисами:
 
@@ -156,9 +152,7 @@ docker compose -f deploy/docker-compose.yml --profile apps up -d
 ```
 
 Без `--profile apps` поднимается только инфраструктура — этот режим нужен для `spring-boot:run`
-из IDEA и для тестов, поэтому он и остался поведением по умолчанию. Порты снаружи те же,
-что при запуске на хосте, так что Prometheus собирает метрики одними и теми же таргетами
-`host.docker.internal:8080…8084` в обоих режимах.
+из IDEA и для тестов, поэтому он и остался поведением по умолчанию.
 
 Демо-данные и JVM-флаги передаются переменными окружения самой команды:
 
@@ -169,10 +163,8 @@ JAVA_OPTS="-XX:+UseZGC -Xmx512m" docker compose -f deploy/docker-compose.yml --p
 
 ## Запуск в Kubernetes
 
-Кластер — Kubernetes от Docker Desktop. Umbrella-чарт `deploy/helm/petstore` держит шесть
-подчартов в `deploy/helm/petstore/charts/`: `petstore-infra` (PostgreSQL, Kafka, Prometheus,
-Grafana) и по чарту на каждый сервис. Образы должны быть собраны локально — в чартах стоит
-`imagePullPolicy: IfNotPresent`, в реестр ничего не пушится.
+Umbrella-чарт `deploy/helm/petstore` держит шесть подчартов в `deploy/helm/petstore/charts/`:
+`petstore-infra` (PostgreSQL, Kafka, Prometheus, Grafana) и по чарту на каждый сервис.
 
 ```bash
 kubectl create namespace petstore
@@ -185,17 +177,15 @@ ConfigMap с дашбордами создаётся отдельной кома
 в `deploy/grafana/dashboards/` — за пределами чарта, а Helm читает файлы только из своего
 каталога. Без неё Grafana всё равно поднимется, только без дашбордов.
 
-| Куда смотреть | Как добраться |
-|---|---|
+| Куда смотреть    | Как добраться                                                                                |
+|------------------|----------------------------------------------------------------------------------------------|
 | Шлюз, Swagger UI | http://localhost:8080/swagger-ui.html — Docker Desktop публикует `LoadBalancer` на localhost |
-| Grafana | `kubectl port-forward -n petstore svc/grafana 3000:3000` |
-| Prometheus | `kubectl port-forward -n petstore svc/prometheus 9090:9090` |
+| Grafana          | `kubectl port-forward -n petstore svc/grafana 3000:3000`                                     |
+| Prometheus       | `kubectl port-forward -n petstore svc/prometheus 9090:9090`                                  |
 
 Объект `Ingress` на шлюз чарт создаёт (`petstore.localhost`), но в Docker Desktop нет
 ingress-контроллера: чтобы он заработал, нужно поставить, например, ingress-nginx. Пока его нет,
 вход — через `LoadBalancer` на 8080.
-
-Реплики меняются вручную, автомасштабирования нет (почему — в `plan.md`):
 
 ```bash
 kubectl scale deployment/catalog-service -n petstore --replicas=3
@@ -223,9 +213,9 @@ helm upgrade --install petstore deploy/helm/petstore -n petstore \
 Grafana поднимается уже настроенной: `deploy/grafana/provisioning/` заводит источник данных
 и папку `PetStore`, дашборды берутся из `deploy/grafana/dashboards/`.
 
-| Дашборд | Что показывает |
-|---|---|
-| **Service Overview** — http://localhost:3000/d/petstore-overview | запросы в секунду, доля неуспешных ответов, перцентили p50/p95/p99, коды ответов, разбивка по экземплярам, таблица самых нагруженных эндпоинтов |
+| Дашборд                                                                | Что показывает                                                                                                                                             |
+|------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Service Overview** — http://localhost:3000/d/petstore-overview       | запросы в секунду, доля неуспешных ответов, перцентили p50/p95/p99, коды ответов, разбивка по экземплярам, таблица самых нагруженных эндпоинтов            |
 | **Application Internals** — http://localhost:3000/d/petstore-internals | размеры справочных кешей и доля попаданий, ошибки по типам, повторы к апстримам и состояние circuit breaker, отказы по перегрузке, heap, паузы GC и потоки |
 
 Сверху у обоих переключатель источника данных и мультиселект сервисов.
@@ -240,3 +230,77 @@ service discovery, поэтому таргеты берутся из `kubernetes
 по аннотациям `prometheus.io/scrape`, `prometheus.io/path` и `prometheus.io/port`.
 Relabeling кладёт имя пода в `instance`, поэтому панели с разбивкой по экземплярам одинаково
 работают и в compose, и в кластере.
+
+## Нагрузочные сценарии (JMeter)
+
+`load/jmeter/` — четыре плана под Apache JMeter 5.6.x. Каждый открывается в GUI (`jmeter -t <файл>`)
+и запускается из консоли; все параметры задаются ключами `-J`, править файл ради потоков
+или длительности не нужно.
+
+| План                           | Что делает                                                                                                                                |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `functional-all-endpoints.jmx` | по запросу на каждый из 33 REST-эндпоинтов четырёх сервисов через шлюз плюс проба самого шлюза                                            |
+| `catalog-read.jmx`             | чтение каталога напрямую в `catalog-service`, мимо шлюза: список с пагинацией, товар по id, фильтр по справочнику, чтение прогретого кеша |
+| `order-create.jmx`             | запись напрямую в `inventory-service` и `order-service`: оформление и подтверждение заказа — сага целиком, вместе с outbox и Kafka        |
+| `overload.jmx`                 | перегрузка: bulkhead сервиса и rate limiter шлюза                                                                                         |
+
+Перед прогоном поднимаются инфраструктура и пять сервисов
+(`docker compose -f deploy/docker-compose.yml --profile apps up -d` либо Helm).
+
+```bash
+# функциональный прогон — 37 запросов, всё должно быть зелёным
+jmeter -n -t load/jmeter/functional-all-endpoints.jmx -l target/functional.jtl
+
+# чтение и запись — мимо шлюза, прямо в сервисы; -e -o собирает HTML-отчёт рядом с .jtl
+jmeter -n -t load/jmeter/catalog-read.jmx -l target/read.jtl -e -o target/read-report \
+       -JcatalogPort=8081 -Jthreads=50 -Jrampup=15 -Jduration=180
+jmeter -n -t load/jmeter/order-create.jmx -l target/order.jtl \
+       -JinventoryPort=8082 -JorderPort=8084 \
+       -Jthreads=20 -Jrampup=10 -Jduration=180 -JstockQuantity=200000
+
+# перегрузка: 200 потоков мимо шлюза в catalog-service и 150 через шлюз
+jmeter -n -t load/jmeter/overload.jmx -l target/overload.jtl \
+       -JbulkheadThreads=200 -JgatewayThreads=150 -Jrampup=5 -Jduration=120
+```
+
+Чтение и запись бьют прямо в сервисы, мимо шлюза, — это и есть значения по умолчанию
+(`catalogPort=8081`, `inventoryPort=8082`, `orderPort=8084`). Через шлюз потолок задавал бы
+не сервис: `RateLimitFilter` — глобальный фильтр на 500 запросов в секунду
+(`GATEWAY_RATE_LIMIT`), и 50 потоков по прогретому кешу выбирают его разрешения за первую же
+секунду. Ограничитель частоты есть только в шлюзе; у сервисов свой bulkhead из `common-core`,
+но он считает одновременные запросы (64 с ожиданием 50 мс) — ни 50, ни 20 потоков его
+не задевают. Прогон через шлюз ставится теми же ключами (`-JcatalogPort=8080`, либо
+`-JinventoryPort=8080 -JorderPort=8080`), но меряет уже шлюз; специально его ограничитель
+показывает `overload.jmx`.
+
+В Kubernetes сервисы наружу не смотрят (`ClusterIP`, Ingress только у шлюза), поэтому прямому
+прогону нужен проброс портов: `kubectl port-forward -n petstore svc/catalog-service 8081:8081`
+и так же для 8082 и 8084.
+
+Три нагрузочных плана работают по демо-данным — товары и клиенты с фиксированными
+идентификаторами, — поэтому сервисы должны быть запущены с `LIQUIBASE_CONTEXTS=demo`:
+`catalog-read.jmx` листает пять страниц по двадцать товаров, `order-create.jmx` заказывает
+демо-товары от имени демо-клиентов, `overload.jmx` просит страницу на сто позиций.
+`functional-all-endpoints.jmx` демо-данных не требует: он заводит свой товар, своего клиента
+и свой адрес, а в конце удаляет клиента (адреса уносит каскад базы) и снимает товар с продажи.
+Неактивный товар, его остаток и два заказа остаются — удалять их API не умеет.
+
+`order-create.jmx` перед основной группой поднимает остатки шести демо-товаров
+до `-JstockQuantity`, каждый на своём складе из демо-данных: иначе длинный прогон упрётся
+в пустой склад, а не в производительность.
+
+`overload.jmx` бьёт двумя группами по разным адресам — одна напрямую в `catalog-service` (8081),
+вторая в шлюз (8080). Через один шлюз обе проверки не поставить: его лимит в 500 запросов
+в секунду отбил бы трафик раньше, чем тот дошёл бы до bulkhead сервиса. Ответ `429` здесь штатный,
+поэтому ассерт принимает `200` и `429` с «игнорировать статус» — без этого JMeter засчитал бы
+каждый отказ ограничителя в ошибки и отчёт стал бы нечитаемым. Разбивка по кодам смотрится
+в `.jtl` или на дашборде Grafana:
+
+```bash
+awk -F, 'NR>1 {print $4}' target/overload.jtl | sort | uniq -c
+```
+
+Растёт `petstore_overload_rejected_total` — счётчик общий у сервисного bulkhead и у ограничителя
+шлюза, различаются они меткой `service`; у шлюза дополнительно падает gauge
+`petstore_ratelimit_available`. Latency успешных запросов при этом остаётся стабильной —
+это и есть проверяемое поведение.

@@ -42,4 +42,25 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="004-2-demo-stock-bulk" author="petstore" context="demo">
+        <comment>
+            Stock for the padded part of the catalogue (products 13-120), spread over the three
+            warehouses: every demo product stays orderable, not just the twelve named ones.
+        </comment>
+        <sql>
+            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved, version,
+                                    created_at, updated_at)
+            SELECT gen_random_uuid(),
+                   ('a0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+                   w.id, 300 + (n % 10) * 100, 0, 0, now(), now()
+            FROM generate_series(13, 120) AS n
+            JOIN warehouse w ON w.code = (ARRAY['MSK', 'SPB', 'EKB'])[1 + n % 3];
+        </sql>
+        <rollback>
+            DELETE FROM stock_item WHERE product_id IN (
+                SELECT ('a0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+                FROM generate_series(13, 120) AS n);
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

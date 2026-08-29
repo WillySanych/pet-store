@@ -64,4 +64,36 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="003-2-demo-products-bulk" author="petstore" context="demo">
+        <comment>
+            Pads the catalogue to 120 products. catalog-read.jmx walks five pages of twenty, and on
+            the twelve named products above four of those pages come back empty — the run would
+            measure paging over nothing instead of reading the catalogue.
+        </comment>
+        <sql>
+            INSERT INTO product (id, sku, name, description, price, active,
+                                 category_id, species_id, brand_id, created_at, updated_at)
+            SELECT ('a0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+                   'PS-DEMO-' || lpad(n::text, 4, '0'),
+                   (ARRAY['Корм', 'Игрушка', 'Домик', 'Гигиена', 'Витамины',
+                          'Аксессуар'])[1 + n % 6] || ' PetStore демо ' || lpad(n::text, 3, '0'),
+                   'Однотипный демо-товар для нагрузочных сценариев',
+                   (199 + (n % 40) * 50)::decimal(12, 2),
+                   true,
+                   c.id, s.id, b.id, now(), now()
+            FROM generate_series(13, 120) AS n
+            JOIN category c ON c.code = (ARRAY['FOOD', 'TOYS', 'HOUSING', 'HYGIENE', 'HEALTH',
+                                               'ACCESSORIES'])[1 + n % 6]
+            JOIN species s ON s.code = (ARRAY['DOG', 'CAT', 'BIRD', 'RODENT', 'FISH',
+                                              'REPTILE'])[1 + n % 6]
+            JOIN brand b ON b.code = (ARRAY['ROYAL_CANIN', 'PURINA', 'ACANA', 'TRIXIE', 'FERPLAST',
+                                            'PETSTORE'])[1 + n % 6];
+        </sql>
+        <rollback>
+            DELETE FROM product WHERE id IN (
+                SELECT ('a0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+                FROM generate_series(13, 120) AS n);
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

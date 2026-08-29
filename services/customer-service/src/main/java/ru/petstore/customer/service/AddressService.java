@@ -19,10 +19,6 @@ import ru.petstore.customer.repository.CustomerRepository;
 import ru.petstore.customer.web.dto.AddressRequest;
 import ru.petstore.customer.web.dto.AddressResponse;
 
-/**
- * Addresses of a customer, and the invariant order-service leans on: a customer who has addresses
- * has exactly one default among them.
- */
 @Service
 @Transactional(readOnly = true)
 public class AddressService {

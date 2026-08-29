@@ -12,8 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import ru.petstore.common.metrics.ServiceMetrics;
 
 /**
- * Counts requests broken down by status and measures their duration; RPS is derived from
- * the counter in Grafana via {@code rate()}.
+ * Counts requests broken down by status and measures their duration.
  */
 public class RequestMetricsFilter extends OncePerRequestFilter implements Ordered {
 

@@ -62,4 +62,54 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="003-3-demo-customers-bulk" author="petstore" context="demo">
+        <comment>
+            Twenty-one more customers (ids 04-24), so order-create.jmx spreads its threads over
+            customers instead of hammering the same three rows.
+        </comment>
+        <sql>
+            INSERT INTO customer (id, email, phone, first_name, last_name, status_id,
+                                  created_at, updated_at)
+            SELECT ('b0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+                   'demo' || lpad(n::text, 3, '0') || '@example.com',
+                   '+790' || lpad(n::text, 8, '0'),
+                   (ARRAY['Анна', 'Борис', 'Вера', 'Глеб', 'Дарья', 'Егор'])[1 + n % 6],
+                   (ARRAY['Волков', 'Зайцев', 'Кузнецов', 'Морозов', 'Соколов',
+                          'Фёдоров'])[1 + (n / 6) % 6],
+                   s.id, now(), now()
+            FROM generate_series(4, 24) AS n
+            JOIN customer_status s ON s.code = 'ACTIVE';
+        </sql>
+        <rollback>
+            DELETE FROM customer WHERE id IN (
+                SELECT ('b0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+                FROM generate_series(4, 24) AS n);
+        </rollback>
+    </changeSet>
+
+    <changeSet id="003-4-demo-addresses-bulk" author="petstore" context="demo">
+        <comment>
+            One default address per added customer: order-service asks customer-service for the
+            delivery target, and a customer without a default address has nothing to answer with.
+        </comment>
+        <sql>
+            INSERT INTO address (id, customer_id, city_id, street, building, apartment, postal_code,
+                                 is_default, created_at, updated_at)
+            SELECT ('c0000000-0000-4000-8000-' || lpad((100 + n)::text, 12, '0'))::uuid,
+                   ('b0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+                   c.id,
+                   (ARRAY['Садовая улица', 'Парковая улица', 'Заречная улица', 'Лесная улица',
+                          'Школьная улица', 'Северный проезд'])[1 + n % 6],
+                   (1 + n % 40)::text, NULL::text, lpad((100000 + n * 7)::text, 6, '0'),
+                   true, now(), now()
+            FROM generate_series(4, 24) AS n
+            JOIN city c ON c.code = (ARRAY['MSK', 'SPB', 'EKB', 'KZN', 'NN', 'NSK'])[1 + n % 6];
+        </sql>
+        <rollback>
+            DELETE FROM address WHERE customer_id IN (
+                SELECT ('b0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+                FROM generate_series(4, 24) AS n);
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

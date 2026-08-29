@@ -122,8 +122,6 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
             log.warn("{} lost a race, asking the caller to retry: {}", endpoint, e.getMessage());
             throw Status.ABORTED.withDescription("Concurrent change, retry the request").asRuntimeException();
         } catch (ServiceUnavailableException e) {
-            // The pod is up but its reference caches warm up only on ApplicationReadyEvent, while the
-            // gRPC server binds during the refresh. Retryable, so not INTERNAL.
             log.warn("{} rejected, service not ready: {}", endpoint, e.getMessage());
             throw Status.UNAVAILABLE.withDescription(e.getMessage()).asRuntimeException();
         } catch (DataAccessException e) {

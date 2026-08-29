@@ -4,8 +4,7 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 
 /**
- * Keeps readiness down until the reference caches are warmed up: a pod with a cold cache would
- * send its first requests to the database.
+ * Keeps readiness down until the reference caches are warmed up.
  */
 public class CacheWarmupHealthIndicator implements HealthIndicator {
 
