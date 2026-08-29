@@ -71,21 +71,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
     }
 
     @Test
-    @DisplayName("Входящий X-Request-Id не перезаписывается")
-    void incomingRequestIdIsPreserved() {
-        String incoming = UUID.randomUUID().toString();
-
-        client.get().uri("/api/v1/products")
-                .header(RequestTracingFilter.REQUEST_ID_HEADER, incoming)
-                .exchange()
-                .expectStatus().isOk()
-                .expectHeader().valueEquals(RequestTracingFilter.REQUEST_ID_HEADER, incoming);
-
-        assertThat(upstream("catalog").awaitRequest().requestId()).isEqualTo(incoming);
-    }
-
-    @Test
-    @DisplayName("Идентификатор возвращается клиенту ровно один раз")
+    @DisplayName("Входящий идентификатор не перезаписывается и возвращается клиенту ровно один раз")
     void requestIdIsReturnedOnce() {
         String incoming = UUID.randomUUID().toString();
 
@@ -97,6 +83,7 @@ class GatewayRoutingTest extends AbstractGatewayTest {
                 .getResponseHeaders();
 
         assertThat(headers.get(RequestTracingFilter.REQUEST_ID_HEADER)).containsExactly(incoming);
+        assertThat(upstream("catalog").awaitRequest().requestId()).isEqualTo(incoming);
     }
 
     @Test

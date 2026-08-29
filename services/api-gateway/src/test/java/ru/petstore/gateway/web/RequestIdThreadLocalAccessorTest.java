@@ -45,20 +45,8 @@ class RequestIdThreadLocalAccessorTest {
                 .block();
 
         assertThat(seenInMdc.get()).isEqualTo("abc");
-    }
 
-    @Test
-    @DisplayName("После обработки идентификатор не остаётся в MDC потока")
-    void mdcIsClearedAfterTheHop() {
-        var mdcAfterHop = new AtomicReference<String>();
-
-        Mono.just("request")
-                .publishOn(Schedulers.boundedElastic())
-                .doOnNext(ignored -> mdcAfterHop.set("hop"))
-                .contextWrite(Context.of(RequestTracingFilter.MDC_KEY, "abc"))
-                .block();
-
-        assertThat(mdcAfterHop.get()).isEqualTo("hop");
+        // The accessor restores the thread MDC, so the id does not leak into the next request.
         assertThat(MDC.get(RequestTracingFilter.MDC_KEY)).isNull();
     }
 }

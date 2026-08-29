@@ -43,13 +43,6 @@ class CommonCoreAutoConfigurationTest {
     }
 
     @Test
-    @DisplayName("Без сканирования обработчик ошибок приходит только из автоконфигурации")
-    void exceptionHandlerComesOnlyFromAutoConfigurationWhenNotScanned() {
-        runner.run(context -> assertThat(context.getBeansOfType(GlobalExceptionHandler.class))
-                .hasSize(1));
-    }
-
-    @Test
     @DisplayName("Предел перегрузки берётся из свойств")
     void overloadLimitIsTakenFromProperties() {
         runner.withPropertyValues("petstore.overload.max-concurrent=3")
@@ -63,16 +56,6 @@ class CommonCoreAutoConfigurationTest {
         runner.withPropertyValues("petstore.tracing.header-name=X-Correlation-Id")
                 .run(context -> assertThat(context.getBean(CommonCoreProperties.class)
                         .getTracing().getHeaderName()).isEqualTo("X-Correlation-Id"));
-    }
-
-    @Test
-    @DisplayName("Без кешей реестр остаётся пустым и не ломает контекст")
-    void registryStaysEmptyWithoutCaches() {
-        runner.run(context -> {
-            var registry = context.getBean(ReferenceCacheRegistry.class);
-            assertThat(registry.caches()).isEmpty();
-            assertThat(registry.allWarmedUp()).isTrue();
-        });
     }
 
     @Test

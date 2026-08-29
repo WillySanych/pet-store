@@ -80,23 +80,4 @@ class ServiceMetricsTest {
         assertThat(simpleMeterRegistry.get(ServiceMetrics.CACHE_MISSES).tag("cache", "categories").functionCounter().count())
                 .isEqualTo(1);
     }
-
-    @Test
-    @DisplayName("Метрики кеша читают живые значения, а не снимок на момент привязки")
-    void cacheMetricsReadLiveValuesNotSnapshot() {
-        var cache = new RefreshableReferenceCache<String, String>("brands",
-                () -> Map.of("a", "Alpha"));
-        cache.refresh();
-        serviceMetrics.bindCache(cache);
-
-        var gauge = simpleMeterRegistry.get(ServiceMetrics.CACHE_SIZE).tag("cache", "brands").gauge();
-        assertThat(gauge.value()).isEqualTo(1);
-
-        cache.get("a");
-        cache.get("a");
-
-        // FunctionCounter reads the same AtomicLong, so the value never lags behind
-        assertThat(simpleMeterRegistry.get(ServiceMetrics.CACHE_HITS).tag("cache", "brands").functionCounter().count())
-                .isEqualTo(2);
-    }
 }

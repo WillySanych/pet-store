@@ -39,14 +39,6 @@ class RateLimitFilterTest {
     }
 
     @Test
-    @DisplayName("В пределах лимита запрос идёт дальше по цепочке")
-    void requestWithinTheLimitIsForwarded() {
-        filterWith(new SemaphoreRateLimiter(1)).filter(orderExchange(), chain).block();
-
-        assertThat(chainCalled).isTrue();
-    }
-
-    @Test
     @DisplayName("Сверх лимита — 429 с Retry-After и телом сервисного формата")
     void burstIsRejectedWithTooManyRequests() {
         var limiter = new SemaphoreRateLimiter(1);

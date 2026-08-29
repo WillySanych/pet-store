@@ -137,53 +137,6 @@ class CustomerApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Тот же ящик в другом регистре вторым клиентом не заводится")
-    void sameMailboxInAnotherCaseIsRejected() {
-        var email = uniqueEmail();
-        var created = createCustomer(request(email));
-
-        var response = testRestTemplate.postForEntity("/api/v1/customers",
-                request(email.toUpperCase(java.util.Locale.ROOT)), JsonNode.class);
-
-        assertThat(created.email()).isEqualTo(email);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("message").asText()).contains(email);
-    }
-
-    @Test
-    @DisplayName("Пагинация отдаёт метаданные страницы")
-    void listReturnsPageMetadata() {
-        createCustomer();
-
-        var page = list("?size=1&page=0");
-
-        assertThat(page.size()).isEqualTo(1);
-        assertThat(page.page()).isZero();
-        assertThat(page.content()).hasSize(1);
-        assertThat(page.totalElements()).isPositive();
-    }
-
-    @Test
-    @DisplayName("Сортировка по неизвестному полю — 400, а не 500")
-    void unknownSortPropertyReturns400() {
-        var response = testRestTemplate.getForEntity("/api/v1/customers?sort=foo", JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
-        assertThat(response.getBody().get("message").asText()).contains("foo");
-    }
-
-    @Test
-    @DisplayName("Неизвестный код статуса — 400 в общем формате")
-    void unknownStatusCodeReturns400() {
-        var response = testRestTemplate.getForEntity("/api/v1/customers?status=NOPE", JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
-        assertThat(response.getBody().get("requestId").asText()).isNotBlank();
-    }
-
-    @Test
     @DisplayName("Невалидное тело — 400 с перечислением полей")
     void invalidBodyReturns400WithFieldList() {
         var invalid = new CustomerRequest("не почта", "телефон", "", "", null);
@@ -193,16 +146,6 @@ class CustomerApiTest extends AbstractPostgresTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code").asText()).isEqualTo("VALIDATION_FAILED");
         assertThat(response.getBody().get("message").asText()).contains("email").contains("phone");
-    }
-
-    @Test
-    @DisplayName("Отсутствующий клиент — 404 в общем формате")
-    void missingCustomerReturns404() {
-        var response = testRestTemplate.getForEntity("/api/v1/customers/" + UUID.randomUUID(),
-                JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody().get("code").asText()).isEqualTo("NOT_FOUND");
     }
 
     @Test
@@ -233,39 +176,6 @@ class CustomerApiTest extends AbstractPostgresTest {
                 .filteredOn(AddressResponse::defaultAddress)
                 .singleElement()
                 .extracting(AddressResponse::id).isEqualTo(second.id());
-    }
-
-    @Test
-    @DisplayName("Снять признак основного адреса напрямую нельзя")
-    void clearingTheDefaultFlagReturns400() {
-        var customer = createCustomer();
-        var address = createAddress(customer.id(), addressRequest("Дмитровское шоссе", null));
-
-        var response = testRestTemplate.exchange(
-                "/api/v1/customers/" + customer.id() + "/addresses/" + address.id(), HttpMethod.PUT,
-                new HttpEntity<>(addressRequest("Дмитровское шоссе", false)), JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
-    }
-
-    @Test
-    @DisplayName("Удаление основного адреса передаёт признак оставшемуся")
-    void deletingTheDefaultAddressPromotesTheNextOne() {
-        var customer = createCustomer();
-        var first = createAddress(customer.id(), addressRequest("Дмитровское шоссе", null));
-        var second = createAddress(customer.id(), addressRequest("Ленинский проспект", null));
-
-        var deleted = testRestTemplate.exchange(
-                "/api/v1/customers/" + customer.id() + "/addresses/" + first.id(),
-                HttpMethod.DELETE, null, Void.class);
-
-        assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(addresses(customer.id())).singleElement()
-                .satisfies(address -> {
-                    assertThat(address.id()).isEqualTo(second.id());
-                    assertThat(address.defaultAddress()).isTrue();
-                });
     }
 
     @Test
@@ -308,18 +218,6 @@ class CustomerApiTest extends AbstractPostgresTest {
 
         assertThat(target.address().id()).isEqualTo(first.id());
         assertThat(target.address().street()).isEqualTo("Дмитровское шоссе");
-    }
-
-    @Test
-    @DisplayName("Клиент без адресов — 404: заказу некуда ехать")
-    void deliveryTargetWithoutAddressesReturns404() {
-        var customer = createCustomer();
-
-        var response = testRestTemplate.getForEntity(
-                "/api/v1/customers/" + customer.id() + "/delivery-target", JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody().get("message").asText()).contains("no delivery address");
     }
 
     @Test

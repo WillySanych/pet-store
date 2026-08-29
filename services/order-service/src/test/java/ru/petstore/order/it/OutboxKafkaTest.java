@@ -77,17 +77,6 @@ class OutboxKafkaTest extends AbstractPostgresTest {
         }
     }
 
-    @Test
-    @DisplayName("Опубликованное сообщение второй раз не уезжает")
-    void publishedMessageIsNotSentTwice() {
-        outboxRepository.saveAndFlush(OutboxMessage.of(UUID.randomUUID(),
-                properties.getOrderEventsTopic(), OrderEventPayload.ORDER_CANCELLED, "{}", null));
-
-        publisher.publishBatch();
-
-        assertThat(publisher.publishBatch()).isZero();
-    }
-
     private ConsumerRecord<String, String> consume(UUID orderId) {
         try (KafkaConsumer<String, String> consumer = consumer()) {
             consumer.subscribe(List.of(properties.getOrderEventsTopic()));

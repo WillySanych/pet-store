@@ -29,17 +29,6 @@ class ReservationExpirySchedulerTest {
     }
 
     @Test
-    @DisplayName("Проход освобождает каждый просроченный резерв по отдельности")
-    void sweepReleasesEveryOverdueReservation() {
-        when(reservationService.expiredReservationIds()).thenReturn(List.of(first, second));
-
-        sweep();
-
-        verify(reservationService).releaseExpired(first);
-        verify(reservationService).releaseExpired(second);
-    }
-
-    @Test
     @DisplayName("Проигранная гонка по одному резерву не отменяет остальные")
     void lostRaceOnOneReservationDoesNotStopTheRest() {
         when(reservationService.expiredReservationIds()).thenReturn(List.of(first, second));

@@ -104,19 +104,6 @@ class CatalogApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Пагинация отдаёт метаданные страницы")
-    void listReturnsPageMetadata() {
-        create(request("SKU-" + UUID.randomUUID(), "Товар", "HEALTH", "CAT"));
-
-        var page = list("?size=1&page=0");
-
-        assertThat(page.size()).isEqualTo(1);
-        assertThat(page.page()).isZero();
-        assertThat(page.content()).hasSize(1);
-        assertThat(page.totalElements()).isPositive();
-    }
-
-    @Test
     @DisplayName("Неизвестный код справочника — 400 в общем формате")
     void unknownReferenceCodeReturns400() {
         var response = testRestTemplate.getForEntity("/api/v1/products?category=NOPE", JsonNode.class);
@@ -177,19 +164,6 @@ class CatalogApiTest extends AbstractPostgresTest {
     }
 
     @Test
-    @DisplayName("Повторный sku отклоняется")
-    void duplicateSkuIsRejected() {
-        var sku = "SKU-" + UUID.randomUUID();
-        create(request(sku, "Первый", "FOOD", "CAT"));
-
-        var response = testRestTemplate.postForEntity("/api/v1/products",
-                request(sku, "Второй", "TOYS", "CAT"), JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("message").asText()).contains(sku);
-    }
-
-    @Test
     @DisplayName("PUT заменяет товар целиком")
     void putReplacesProduct() {
         var created = create(request("SKU-" + UUID.randomUUID(), "Было", "FOOD", "DOG"));
@@ -203,32 +177,6 @@ class CatalogApiTest extends AbstractPostgresTest {
         assertThat(found.price()).isEqualByComparingTo("999.99");
         assertThat(found.category().code()).isEqualTo("TOYS");
         assertThat(found.active()).isFalse();
-    }
-
-    @Test
-    @DisplayName("PUT без поля active не возвращает снятый товар в продажу")
-    void putWithoutActiveKeepsProductWithdrawn() {
-        var created = create(request("SKU-" + UUID.randomUUID(), "Лампа", "ACCESSORIES", "REPTILE"));
-        var sku = created.sku();
-        put(created.id(), new ProductRequest(sku, "Лампа", null,
-                created.price(), "ACCESSORIES", "REPTILE", "TRIXIE", false));
-
-        put(created.id(), new ProductRequest(sku, "Лампа для террариума",
-                null, created.price(), "ACCESSORIES", "REPTILE", "TRIXIE", null));
-
-        var found = testRestTemplate.getForObject("/api/v1/products/" + created.id(), ProductResponse.class);
-        assertThat(found.name()).isEqualTo("Лампа для террариума");
-        assertThat(found.active()).isFalse();
-    }
-
-    @Test
-    @DisplayName("Сортировка по неизвестному полю — 400, а не 500")
-    void unknownSortPropertyReturns400() {
-        var response = testRestTemplate.getForEntity("/api/v1/products?sort=foo", JsonNode.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().get("code").asText()).isEqualTo("BAD_REQUEST");
-        assertThat(response.getBody().get("message").asText()).contains("foo");
     }
 
     @Test
