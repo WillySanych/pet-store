@@ -4,29 +4,17 @@
 
 ## Подготовка
 
-Сборка образов локально:
+Стенд поднимается так же, как описано в [README](../README.md#kubernetes): сборка образов
+`docker compose build`, затем `helm upgrade --install` с контекстом `demo`. Демо-данные здесь
+обязательны - на них рассчитаны планы JMeter, которыми даётся нагрузка.
 
-```bash
-docker compose -f deploy/docker-compose.yml build
-```
-
-Поднять все приложения с контекстом `demo`:
-
-```bash
-helm upgrade --install petstore deploy/helm/petstore -n petstore --create-namespace \
-  --set catalog-service.env.LIQUIBASE_CONTEXTS=demo \
-  --set inventory-service.env.LIQUIBASE_CONTEXTS=demo \
-  --set customer-service.env.LIQUIBASE_CONTEXTS=demo
-
-kubectl wait --for=condition=ready pod --all -n petstore --timeout=300s
-```
-
-Сервисы наружу не смотрят - у них `ClusterIP`, снаружи только шлюз (`LoadBalancer` на 8080).
-Прямому прогону нужны туннели: `catalog-read.jmx` бьёт в 8081, `order-create.jmx` - в 8082
+Четыре прикладных сервиса наружу не смотрят - у них `ClusterIP`; на localhost Docker Desktop
+публикует только `LoadBalancer`-сервисы: шлюз (8080), Grafana (3000) и Prometheus (9090).
+Прямому прогону jmeter тестов нужны туннели: `catalog-read.jmx` бьёт в 8081, `order-create.jmx` - в 8082
 и 8084. `customer-service` пробрасывать не надо, к нему ходит только `order-service` внутри
 кластера.
 
-Одна команда поднимает один туннель и держит терминал, поэтому запускаем их в фоне:
+Туннели:
 
 ```bash
 # HTTP - для нагрузки

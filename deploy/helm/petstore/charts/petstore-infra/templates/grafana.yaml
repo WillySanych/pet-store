@@ -37,6 +37,7 @@ metadata:
   name: grafana
   labels: {{- include "infra.labels" "grafana" | nindent 4 }}
 spec:
+  type: {{ .Values.grafana.service.type }}
   selector: {{- include "infra.selectorLabels" "grafana" | nindent 4 }}
   ports:
     - name: http

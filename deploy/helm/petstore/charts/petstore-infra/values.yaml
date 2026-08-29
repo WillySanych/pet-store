@@ -14,9 +14,13 @@ kafka:
 prometheus:
   image: prom/prometheus:v3.13.2
   retention: 6h
+  service:
+    type: LoadBalancer
 
 grafana:
   image: grafana/grafana:13.0.6
   adminUser: admin
   adminPassword: admin
   dashboardsConfigMap: petstore-dashboards
+  service:
+    type: LoadBalancer

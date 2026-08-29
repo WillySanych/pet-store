@@ -1,39 +1,55 @@
 # pet-store
 
-Отказоустойчивая микросервисная архитектура онлайн-зоомагазина с развёртыванием в Kubernetes.
+Учебный проект по курсу Java Advanced: онлайн-зоомагазин из пяти микросервисов на Java 21
+и Spring Boot 3.5, который разворачивается в Kubernetes.
+
+Что умеет: клиент через шлюз смотрит каталог товаров, создаёт в системе себя и адрес доставки,
+оформляет заказ. Заказ резервирует остаток на складе, а после подтверждения склад списывает резерв
+по событию из Kafka. Если в процессе отказал любой из сервисов, заказ не создаётся, а резерв
+освобождается.
 
 ## Состав
 
-| Приложение             | Порт            | Схема БД       |
-|------------------------|-----------------|----------------|
-| `api-gateway`          | 8080            | —              |
-| `catalog-service`      | 8081, gRPC 9101 | `catalog`      |
-| `inventory-service`    | 8082, gRPC 9102 | `inventory`    |
-| `customer-service`     | 8083            | `customer`     |
-| `order-service`        | 8084            | `orders`       |
+| Приложение          | Порт            | Схема БД    | Что делает                             |
+|---------------------|-----------------|-------------|----------------------------------------|
+| `api-gateway`       | 8080            | —           | единая точка входа, сводный Swagger UI |
+| `catalog-service`   | 8081, gRPC 9101 | `catalog`   | товары, категории, виды, бренды        |
+| `inventory-service` | 8082, gRPC 9102 | `inventory` | остатки на складах и резервы           |
+| `customer-service`  | 8083            | `customer`  | клиенты и адреса доставки              |
+| `order-service`     | 8084            | `orders`    | оформление заказов                     |
 
-Общие модули: `common/common-core` (кеши, справочники, метрики, сквозное логирование, защита
-от перегрузки, блокировка планировщиков), `common/common-proto` (контракты gRPC).
-Бенчмарки JMH — в `benchmarks/`.
+Общие модули: `common/common-core` (кеши справочников, метрики, сквозное логирование, защита
+от перегрузки, блокировка планировщиков) и `common/common-proto` (контракты gRPC). Бенчмарки
+JMH — в `benchmarks/`, нагрузочные сценарии — в `load/jmeter/`.
+
+База одна — `petstore`, у каждого сервиса в ней своя схема.
 
 ## Требования
 
-Java 21, Maven 3.9+, Docker с Compose v2+; для развёртывания в кластере — Kubernetes
-(в проекте это Kubernetes от Docker Desktop) и Helm (чарты проверены на 4.2).
+Java 21, Maven 3.9+, Docker с Compose v2+. Для кластера — Kubernetes и Helm.
 
-## Сборка
-
-```bash
-mvn clean install
-```
-
-## Локальная инфраструктура
-
-PostgreSQL, Kafka, Prometheus и Grafana поднимаются одной командой:
+## Тесты
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d
+mvn clean test
 ```
+
+Docker должен быть запущен: интеграционные тесты поднимают PostgreSQL и Kafka через
+Testcontainers. Отдельно собирать проект перед запуском не нужно — образы собирают себя сами.
+
+## Запуск локально
+
+Два способа, оба поднимают весь стек целиком: docker compose и Helm в Kubernetes.
+
+### Docker Compose
+
+```bash
+docker compose -f deploy/docker-compose.yml build     # собрать образы
+LIQUIBASE_CONTEXTS=demo docker compose -f deploy/docker-compose.yml up -d   # запуск окружения с демо-данными
+```
+
+Поднимается девять контейнеров: четыре с инфраструктурой и пять приложений. Порты приложений —
+как в таблице «Состав», инфраструктура доступна по этим адресам:
 
 | Сервис     | Адрес                 | Доступ                                          |
 |------------|-----------------------|-------------------------------------------------|
@@ -42,263 +58,92 @@ docker compose -f deploy/docker-compose.yml up -d
 | Prometheus | http://localhost:9090 | —                                               |
 | Grafana    | http://localhost:3000 | `admin` / `admin`                               |
 
-Четыре схемы (`catalog`, `inventory`, `customer`, `orders`) создаются автоматически
-при первой инициализации тома скриптом `deploy/postgres/init/01-schemas.sql`.
+Четыре схемы создаёт скрипт `deploy/postgres/init/01-schemas.sql` при первой инициализации тома.
+Таблицы и справочные данные создаёт Liquibase при старте каждого сервиса.
 
-Остановить с сохранением данных — `docker compose -f deploy/docker-compose.yml stop`.
-Удалить вместе с томами — `... down -v`.
+Проверка живого сервиса — `http://localhost:<порт>/actuator/health`, метрики —
+`/actuator/prometheus`. Весь API виден через шлюз: http://localhost:8080/swagger-ui.html.
 
-## Запуск сервиса
+Остановка:
 
 ```bash
-mvn -pl services/catalog-service spring-boot:run
+docker compose -f deploy/docker-compose.yml down      # остановить и удалить контейнеры, данные останутся
+docker compose -f deploy/docker-compose.yml down -v   # то же самое вместе с томами: база и Kafka станут пустыми
 ```
 
-Проверка: http://localhost:8081/actuator/health и http://localhost:8081/actuator/prometheus
+### Kubernetes
 
-### `catalog-service`
-
-Сама схема `catalog` появляется при первой инициализации тома PostgreSQL — её создаёт
-`deploy/postgres/init/01-schemas.sql` вместе с четырьмя остальными. Таблицы и справочники
-(`category`, `species`, `brand`) заводит в ней Liquibase при старте сервиса, поэтому
-инфраструктура из `docker-compose` должна быть поднята.
-
-Демо-каталог лежит под контекстом `demo` и по умолчанию **не** добавляется: двенадцать
-именованных товаров плюс однотипный хвост до ста двадцати позиций, по которому листают
-страницы нагрузочные сценарии. Включается контекстом: `LIQUIBASE_CONTEXTS=demo`.
-
-### `inventory-service`
+Образы берутся локальные, в реестр они не пушатся, поэтому перед установкой их нужно собрать
+через `docker compose build`.
 
 ```bash
-mvn -pl services/inventory-service spring-boot:run
-```
-
-Остатки и резервы: REST на 8082, gRPC-сервер `Reserve`/`Release` на 9102, потребитель Kafka
-топика `order-events`. Таблицы схемы `inventory` и справочники (`warehouse`, `reservation_status`)
-заводит Liquibase при старте, поэтому инфраструктура из `docker-compose` должна быть поднята.
-
-Демо-остатки на все сто двадцать товаров каталога — тоже под контекстом `demo`:
-`LIQUIBASE_CONTEXTS=demo` в обоих сервисах даёт каталог, который можно заказать.
-
-Остаток списывается **только** по событию `ORDER_CONFIRMED` из Kafka. Топик `order-events` заводит
-его продюсер, `order-service`.
-
-### `customer-service`
-
-```bash
-mvn -pl services/customer-service spring-boot:run
-```
-
-Клиенты и их адреса доставки: REST на 8083. Таблицы схемы `customer` и справочники
-(`city`, `customer_status`) заводит Liquibase при старте, поэтому инфраструктура
-из `docker-compose` должна быть поднята.
-
-Адреса — подресурс клиента: `/api/v1/customers/{id}/addresses`.
-У клиента с адресами ровно один основной: первый адрес становится им автоматически, назначение
-нового снимает признак с прежнего, а удаление основного передаёт его старейшему из оставшихся.
-Снять признак напрямую нельзя — его переводят на другой адрес.
-
-`order-service` берёт клиента и адрес доставки одним запросом:
-`GET /api/v1/customers/{id}/delivery-target`; параметр `addressId` выбирает адрес вместо
-основного. Заблокированному клиенту сервис не отказывает — статус едет в ответе, решение
-за вызывающим.
-
-Двадцать четыре демо-клиента с адресами — под контекстом `demo`: `LIQUIBASE_CONTEXTS=demo`.
-
-### `order-service`
-
-```bash
-mvn -pl services/order-service spring-boot:run
-```
-
-Оформление заказов: REST на 8084, gRPC-клиент каталога и склада, продюсер Kafka `order-events`.
-Таблицы схемы `orders` и справочники (`order_status`, `delivery_type`, `payment_method`) заводит
-Liquibase при старте.
-
-Демо-заказов нет: заказ создаётся через API на демо-данных каталога, склада и клиентов.
-
-### `api-gateway`
-
-```bash
-mvn -pl services/api-gateway spring-boot:run
-```
-
-Единая точка входа: 8080, маршруты на четыре сервиса, сквозной `X-Request-Id`, ограничение
-частоты запросов и сводный Swagger UI. Базы данных у шлюза нет.
-
-Адреса сервисов задаются переменными окружения `CATALOG_URL`, `INVENTORY_URL`, `CUSTOMER_URL`
-и `ORDER_URL` (по умолчанию `http://localhost:8081`…`8084`), предел частоты —
-`GATEWAY_RATE_LIMIT` (по умолчанию 500 запросов в секунду на экземпляр).
-
-## Запуск в Docker
-
-Образ у всех пяти сервисов собирается одним многоступенчатым `Dockerfile` в корне репозитория:
-имя модуля передаётся аргументом `SERVICE`, первая ступень (`maven:3.9.11-eclipse-temurin-21`)
-собирает jar командой `mvn -pl services/${SERVICE} -am -DskipTests package`, вторая
-(`eclipse-temurin:21-jdk`) получает только jar и запускает его. Тесты в образе
-пропускаются намеренно: интеграционным нужен Testcontainers, то есть Docker внутри сборки, —
-они проходят раньше, в `mvn install`.
-
-Команда для сборки:
-
-```bash
-docker compose -f deploy/docker-compose.yml build
-```
-
-Инфраструктура вместе с сервисами:
-
-```bash
-docker compose -f deploy/docker-compose.yml up -d
-```
-
-Демо-данные и JVM-флаги передаются переменными окружения самой команды:
-
-```bash
-LIQUIBASE_CONTEXTS=demo docker compose -f deploy/docker-compose.yml up -d
-JAVA_OPTS="-Xmx512m" docker compose -f deploy/docker-compose.yml up -d
-```
-
-## Запуск в Kubernetes
-
-Umbrella-чарт `deploy/helm/petstore` держит шесть подчартов в `deploy/helm/petstore/charts/`:
-`petstore-infra` (PostgreSQL, Kafka, Prometheus, Grafana) и по чарту на каждый сервис.
-
-```bash
-kubectl create namespace petstore
-kubectl create configmap petstore-dashboards -n petstore --from-file=deploy/grafana/dashboards
-helm upgrade --install petstore deploy/helm/petstore -n petstore
-kubectl get pods -n petstore -w
-```
-
-ConfigMap с дашбордами создаётся отдельной командой, потому что единственная их копия лежит
-в `deploy/grafana/dashboards/` — за пределами чарта, а Helm читает файлы только из своего
-каталога. Без неё Grafana всё равно поднимется, только без дашбордов.
-
-| Куда смотреть    | Как добраться                                                                                |
-|------------------|----------------------------------------------------------------------------------------------|
-| Шлюз, Swagger UI | http://localhost:8080/swagger-ui.html — Docker Desktop публикует `LoadBalancer` на localhost |
-| Grafana          | `kubectl port-forward -n petstore svc/grafana 3000:3000`                                     |
-| Prometheus       | `kubectl port-forward -n petstore svc/prometheus 9090:9090`                                  |
-
-Наружу смотрит только шлюз — у него `LoadBalancer`, у четырёх сервисов `ClusterIP`.
-До сервиса напрямую — `kubectl port-forward -n petstore svc/catalog-service 8081:8081`.
-
-Реплики добавляются на ходу:
-
-```bash
-kubectl scale deployment/catalog-service -n petstore --replicas=3
-```
-
-Демо-данные — `LIQUIBASE_CONTEXTS` в values всех четырёх сервисов с базой:
-
-```bash
-helm upgrade --install petstore deploy/helm/petstore -n petstore \
+helm upgrade --install petstore deploy/helm/petstore -n petstore --create-namespace --wait --timeout 5m \
   --set catalog-service.env.LIQUIBASE_CONTEXTS=demo \
   --set inventory-service.env.LIQUIBASE_CONTEXTS=demo \
   --set customer-service.env.LIQUIBASE_CONTEXTS=demo
+
+kubectl create configmap petstore-dashboards -n petstore --from-file=deploy/grafana/dashboards
 ```
 
-Снести релиз: `helm uninstall petstore -n petstore`. Тома PostgreSQL и Kafka переживают удаление
-релиза — `kubectl delete pvc -n petstore --all`, если нужна чистая база.
+Три `--set` включают демо-данные, по одному на сервис с тестовыми данными:
+контекст `demo` в кластере задаётся каждому отдельно.
 
-## Метрики и дашборды
+С `--wait` команда возвращается, только когда все поды релиза готовы, — на первом запуске это
+минута-полторы, пока стартуют PostgreSQL, Kafka и сервисы. Прогресс при этом не печатается;
+посмотреть его можно из соседнего окна: `kubectl get pods -n petstore -w`.
 
-Каждый сервис отдаёт метрики на `/actuator/prometheus`. Prometheus из `docker-compose` собирает их
-статическими таргетами `host.docker.internal:8080`…`8084`. Адрес один на оба режима: он ведёт
-на хост, а туда published-портами выходят и контейнеры сервисов, и процессы, запущенные
-через `spring-boot:run`. Живы ли все пять целей, видно на http://localhost:9090/targets.
+| Приложение       | Адрес                                  |
+|------------------|----------------------------------------|
+| Шлюз, Swagger UI | http://localhost:8080/swagger-ui.html  |
+| Grafana          | http://localhost:3000, `admin`/`admin` |
+| Prometheus       | http://localhost:9090                  |
 
-Grafana поднимается уже настроенной: `deploy/grafana/provisioning/` заводит источник данных
-и папку `PetStore`, дашборды берутся из `deploy/grafana/dashboards/`.
+У четырёх сервисов `ClusterIP`, до них — проброс порта:
+`kubectl port-forward -n petstore svc/catalog-service 8081:8081`.
 
-| Дашборд                                                                | Что показывает                                                                                                                                             |
-|------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Service Overview** — http://localhost:3000/d/petstore-overview       | запросы в секунду, доля неуспешных ответов, перцентили p50/p95/p99, коды ответов, разбивка по экземплярам, таблица самых нагруженных эндпоинтов            |
-| **Application Internals** — http://localhost:3000/d/petstore-internals | размеры справочных кешей и доля попаданий, ошибки по типам, повторы к апстримам и состояние circuit breaker, отказы по перегрузке, heap, паузы GC и потоки |
-
-Сверху у обоих переключатель источника данных и мультиселект сервисов.
-
-Панели «Повторы и отказы апстримов» и «Отказы по перегрузке» пусты, пока событие не случилось
-хотя бы раз: Micrometer заводит счётчик на первом инкременте, до этого метрики нет в выдаче
-`/actuator/prometheus`. Это не поломка дашборда.
-
-В Kubernetes работает второй конфиг — он нужен только кластеру, поэтому и лежит в чарте:
-`deploy/helm/petstore/charts/petstore-infra/files/prometheus.yml`. Адреса подов известны только
-service discovery, поэтому таргеты берутся из `kubernetes_sd_configs`, а поды отбираются
-по аннотациям `prometheus.io/scrape`, `prometheus.io/path` и `prometheus.io/port`.
-Relabeling кладёт имя пода в `instance`, поэтому панели с разбивкой по экземплярам одинаково
-работают и в compose, и в кластере.
-
-## Нагрузочные сценарии (JMeter)
-
-`load/jmeter/` — четыре плана под Apache JMeter 5.6.x. Каждый открывается в GUI (`jmeter -t <файл>`)
-и запускается из консоли; все параметры задаются ключами `-J`, править файл ради потоков
-или длительности не нужно.
-
-| План                           | Что делает                                                                                                                                |
-|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| `functional-all-endpoints.jmx` | по запросу на каждый из 33 REST-эндпоинтов четырёх сервисов через шлюз плюс проба самого шлюза                                            |
-| `catalog-read.jmx`             | чтение каталога напрямую в `catalog-service`, мимо шлюза: список с пагинацией, товар по id, фильтр по справочнику, чтение прогретого кеша |
-| `order-create.jmx`             | запись напрямую в `inventory-service` и `order-service`: оформление и подтверждение заказа — сага целиком, вместе с outbox и Kafka        |
-| `overload.jmx`                 | перегрузка: bulkhead сервиса и rate limiter шлюза                                                                                         |
-
-Перед прогоном поднимаются инфраструктура и пять сервисов
-(`docker compose -f deploy/docker-compose.yml up -d` либо Helm).
+Удаление:
 
 ```bash
-# функциональный прогон — 37 запросов, всё должно быть зелёным
-jmeter -n -t load/jmeter/functional-all-endpoints.jmx -l target/functional.jtl
-
-# чтение и запись — мимо шлюза, прямо в сервисы; -e -o собирает HTML-отчёт рядом с .jtl
-jmeter -n -t load/jmeter/catalog-read.jmx -l target/read.jtl -e -o target/read-report \
-       -JcatalogPort=8081 -Jthreads=50 -Jrampup=15 -Jduration=180
-jmeter -n -t load/jmeter/order-create.jmx -l target/order.jtl \
-       -JinventoryPort=8082 -JorderPort=8084 \
-       -Jthreads=20 -Jrampup=10 -Jduration=180 -JstockQuantity=200000
-
-# перегрузка: 200 потоков мимо шлюза в catalog-service и 150 через шлюз
-jmeter -n -t load/jmeter/overload.jmx -l target/overload.jtl \
-       -JbulkheadThreads=200 -JgatewayThreads=150 -Jrampup=5 -Jduration=120
+helm uninstall petstore -n petstore   # снести релиз, тома с данными останутся
+kubectl delete namespace petstore     # удалить всё разом: релиз, дашборды и тома
 ```
 
-Чтение и запись бьют прямо в сервисы, мимо шлюза, — это и есть значения по умолчанию
-(`catalogPort=8081`, `inventoryPort=8082`, `orderPort=8084`). Через шлюз потолок задавал бы
-не сервис: `RateLimitFilter` — глобальный фильтр на 500 запросов в секунду
-(`GATEWAY_RATE_LIMIT`), и 50 потоков по прогретому кешу выбирают его разрешения за первую же
-секунду. Ограничитель частоты есть только в шлюзе; у сервисов свой bulkhead из `common-core`,
-но он считает одновременные запросы (64 с ожиданием 50 мс) — ни 50, ни 20 потоков его
-не задевают. Прогон через шлюз ставится теми же ключами (`-JcatalogPort=8080`, либо
-`-JinventoryPort=8080 -JorderPort=8080`), но меряет уже шлюз; специально его ограничитель
-показывает `overload.jmx`.
+### Демо-данные
 
-В Kubernetes сервисы наружу не смотрят (`ClusterIP`, снаружи только шлюз), поэтому прямому
-прогону нужен проброс портов: `kubectl port-forward -n petstore svc/catalog-service 8081:8081`
-и так же для 8082 и 8084.
+По умолчанию база пустая: демо-данные лежат в Liquibase-контексте `demo`. Это 120 товаров
+в каталоге, остатки на них на складах и 24 клиента с адресами — на них рассчитаны нагрузочные
+сценарии.
 
-Три нагрузочных плана работают по демо-данным — товары и клиенты с фиксированными
-идентификаторами, — поэтому сервисы должны быть запущены с `LIQUIBASE_CONTEXTS=demo`:
-`catalog-read.jmx` листает пять страниц по двадцать товаров, `order-create.jmx` заказывает
-демо-товары от имени демо-клиентов, `overload.jmx` просит страницу на сто позиций.
-`functional-all-endpoints.jmx` демо-данных не требует: он заводит свой товар, своего клиента
-и свой адрес, а в конце удаляет клиента (адреса уносит каскад базы) и снимает товар с продажи.
-Неактивный товар, его остаток и два заказа остаются — удалять их API не умеет.
+## Карта тем лекций
 
-`order-create.jmx` перед основной группой поднимает остатки шести демо-товаров
-до `-JstockQuantity`, каждый на своём складе из демо-данных: иначе длинный прогон упрётся
-в пустой склад, а не в производительность.
+Таблица покрытия тем:
 
-`overload.jmx` бьёт двумя группами по разным адресам — одна напрямую в `catalog-service` (8081),
-вторая в шлюз (8080). Через один шлюз обе проверки не поставить: его лимит в 500 запросов
-в секунду отбил бы трафик раньше, чем тот дошёл бы до bulkhead сервиса. Ответ `429` здесь штатный,
-поэтому ассерт принимает `200` и `429` с «игнорировать статус» — без этого JMeter засчитал бы
-каждый отказ ограничителя в ошибки и отчёт стал бы нечитаемым. Разбивка по кодам смотрится
-в `.jtl` или на дашборде Grafana:
+| №  | Тема                                                     | Где в проекте                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+|----|----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1  | Java 11 vs 17 vs 21, OpenJDK vs OracleJDK                | Java 21 во всех модулях — [`pom.xml`](pom.xml); образы на OpenJDK-сборке Eclipse Temurin — [`Dockerfile`](Dockerfile)                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 2  | Memory management. JVM memory structure                  | `-Xmx` согласован с лимитами пода — [`values.yaml`](deploy/helm/petstore/charts/catalog-service/values.yaml); heap и паузы GC на дашборде [`application-internals.json`](deploy/grafana/dashboards/application-internals.json); как смотреть — [`docs/profiling.md`](docs/profiling.md)                                                                                                                                                                                                                                                          |
+| 3  | Виртуальные потоки                                       | `spring.threads.virtual.enabled` — [`application.yml`](services/catalog-service/src/main/resources/application.yml); параллельные вызовы соседних сервисов — [`UpstreamExecutor`](services/order-service/src/main/java/ru/petstore/order/client/UpstreamExecutor.java)                                                                                                                                                                                                                                                                           |
+| 4  | Memory dump                                              | как снять и как читать — [`docs/profiling.md`](docs/profiling.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 5  | Java Microbenchmark Harness                              | модуль [`benchmarks/`](benchmarks/src/main/java/ru/petstore/benchmarks/ReferenceCacheReadBenchmark.java)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 6  | JMeter и организация нагрузочного тестирования           | четыре плана — [`load/jmeter/`](load/jmeter)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 7  | j.u.c: Atomics, ConcurrentHashMap, ConcurrentSkipListMap | [`RefreshableReferenceCache`](common/common-core/src/main/java/ru/petstore/common/cache/RefreshableReferenceCache.java) — оба словаря и счётчики попаданий                                                                                                                                                                                                                                                                                                                                                                                       |
+| 8  | j.u.c: Locks, ReadWriteLock, ReentrantLock               | `ReentrantReadWriteLock` при подмене справочника — [`RefreshableReferenceCache`](common/common-core/src/main/java/ru/petstore/common/cache/RefreshableReferenceCache.java)                                                                                                                                                                                                                                                                                                                                                                       |
+| 9  | j.u.c: CountDownLatch, Semaphore, Phaser                 | `CountDownLatch` на прогреве кеша — [`RefreshableReferenceCache`](common/common-core/src/main/java/ru/petstore/common/cache/RefreshableReferenceCache.java); `Semaphore` в ограничителе частоты — [`SemaphoreRateLimiter`](services/api-gateway/src/main/java/ru/petstore/gateway/web/SemaphoreRateLimiter.java)                                                                                                                                                                                                                                 |
+| 10 | Профилирование: Thread dump, JFR                         | [`docs/profiling.md`](docs/profiling.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 11 | Профилирование: jvisualvm, asyncProfiler                 | VisualVM и флеймграф через JFR и JMC — [`docs/profiling.md`](docs/profiling.md), там же почему не async-profiler                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 12 | Реактивное программирование: Reactor                     | шлюз на Spring Cloud Gateway (WebFlux) — [`api-gateway`](services/api-gateway/src/main/java/ru/petstore/gateway)                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 13 | Java NIO                                                 | Netty под WebFlux в шлюзе — косвенно, через библиотеку                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 14 | Вспоминаем Docker                                        | многоступенчатый [`Dockerfile`](Dockerfile) с `ARG SERVICE`, [`docker-compose.yml`](deploy/docker-compose.yml) на девять контейнеров                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 15 | Введение в Kubernetes                                    | Deployment, StatefulSet, Service, ConfigMap, Secret, PVC и три пробы — [`deployment.yaml`](deploy/helm/petstore/charts/catalog-service/templates/deployment.yaml)                                                                                                                                                                                                                                                                                                                                                                                |
+| 16 | Обзор Helm                                               | umbrella-чарт и шесть подчартов — [`deploy/helm/petstore`](deploy/helm/petstore)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 17 | Разбор Actuator'а (Spring Boot 3)                        | пробы и группа readiness — [`CommonDefaultsEnvironmentPostProcessor`](common/common-core/src/main/java/ru/petstore/common/autoconfigure/CommonDefaultsEnvironmentPostProcessor.java), свой индикатор — [`CacheWarmupHealthIndicator`](common/common-core/src/main/java/ru/petstore/common/cache/CacheWarmupHealthIndicator.java)                                                                                                                                                                                                                 |
+| 18 | Метрики                                                  | самописные метрики — [`ServiceMetrics`](common/common-core/src/main/java/ru/petstore/common/metrics/ServiceMetrics.java), снимает их [`RequestMetricsFilter`](common/common-core/src/main/java/ru/petstore/common/web/RequestMetricsFilter.java)                                                                                                                                                                                                                                                                                                 |
+| 19 | Prometheus & Grafana                                     | [`prometheus.yml`](deploy/prometheus/prometheus.yml) для compose, [`prometheus.yml`](deploy/helm/petstore/charts/petstore-infra/files/prometheus.yml) для кластера, два дашборда — [`deploy/grafana/dashboards`](deploy/grafana/dashboards)                                                                                                                                                                                                                                                                                                      |
+| 20 | Сквозное логирование в микросервисах                     | `X-Request-Id` и MDC — [`RequestTracingFilter`](common/common-core/src/main/java/ru/petstore/common/web/RequestTracingFilter.java), дальше в gRPC — [`RequestIdClientInterceptor`](common/common-core/src/main/java/ru/petstore/common/grpc/RequestIdClientInterceptor.java), в Kafka — [`RequestIdRecordInterceptor`](common/common-core/src/main/java/ru/petstore/common/kafka/RequestIdRecordInterceptor.java), в виртуальные потоки — [`MdcPropagation`](common/common-core/src/main/java/ru/petstore/common/concurrent/MdcPropagation.java) |
+| 21 | Проектирование и архитектура микросервисов               | пять сервисов, три модели данных, у каждого сервиса с базой своя схема — [`services/`](services)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 22 | REST: Swagger, OpenAPI                                   | springdoc в каждом сервисе, описание API — [`@OpenAPIDefinition`](services/catalog-service/src/main/java/ru/petstore/catalog/CatalogServiceApplication.java), сводный UI в шлюзе — [`SwaggerUiConfig`](services/api-gateway/src/main/java/ru/petstore/gateway/config/SwaggerUiConfig.java)                                                                                                                                                                                                                                                       |
+| 23 | Protobuf, gRPC                                           | контракты — [`common-proto`](common/common-proto/src/main/proto), серверы — [`CatalogGrpcService`](services/catalog-service/src/main/java/ru/petstore/catalog/grpc/CatalogGrpcService.java) и [`InventoryGrpcService`](services/inventory-service/src/main/java/ru/petstore/inventory/grpc/InventoryGrpcService.java), клиенты — [`order-service`](services/order-service/src/main/java/ru/petstore/order/client)                                                                                                                                |
+| 24 | Kafka                                                    | топик `order-events` по схеме outbox: продюсер [`OutboxPublisher`](services/order-service/src/main/java/ru/petstore/order/outbox/OutboxPublisher.java), потребитель [`OrderEventListener`](services/inventory-service/src/main/java/ru/petstore/inventory/kafka/OrderEventListener.java)                                                                                                                                                                                                                                                         |
+| 25 | Балансировка нагрузки                                    | маршруты шлюза — [`GatewayRoutesConfig`](services/api-gateway/src/main/java/ru/petstore/gateway/config/GatewayRoutesConfig.java); в кластере трафик по репликам раскидывает Service — [`service.yaml`](deploy/helm/petstore/charts/catalog-service/templates/service.yaml), число реплик задаёт `replicaCount` в [`values.yaml`](deploy/helm/petstore/charts/catalog-service/values.yaml)                                                                                                                                                        |
+| 26 | Шаблоны проектирования отказоустойчивого сервиса         | повтор, circuit breaker и таймаут — [`UpstreamCall`](services/order-service/src/main/java/ru/petstore/order/client/UpstreamCall.java), защита от перегрузки — [`OverloadInterceptor`](common/common-core/src/main/java/ru/petstore/common/web/OverloadInterceptor.java) и [`SemaphoreRateLimiter`](services/api-gateway/src/main/java/ru/petstore/gateway/web/SemaphoreRateLimiter.java), надёжная доставка событий — [`OutboxPublisher`](services/order-service/src/main/java/ru/petstore/order/outbox/OutboxPublisher.java)                    |
 
-```bash
-awk -F, 'NR>1 {print $4}' target/overload.jtl | sort | uniq -c
-```
-
-Растёт `petstore_overload_rejected_total` — счётчик общий у сервисного bulkhead и у ограничителя
-шлюза, различаются они меткой `service`; у шлюза дополнительно падает gauge
-`petstore_ratelimit_available`. Latency успешных запросов при этом остаётся стабильной —
-это и есть проверяемое поведение.

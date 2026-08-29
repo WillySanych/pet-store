@@ -43,6 +43,7 @@ metadata:
   name: prometheus
   labels: {{- include "infra.labels" "prometheus" | nindent 4 }}
 spec:
+  type: {{ .Values.prometheus.service.type }}
   selector: {{- include "infra.selectorLabels" "prometheus" | nindent 4 }}
   ports:
     - name: http
