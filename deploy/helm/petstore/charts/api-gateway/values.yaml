@@ -11,12 +11,6 @@ ports:
 service:
   type: LoadBalancer
 
-ingress:
-  enabled: true
-  className: ""
-  host: petstore.localhost
-  path: /
-
 database:
   enabled: false
   secretName: petstore-db

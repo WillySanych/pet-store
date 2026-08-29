@@ -11,12 +11,6 @@ ports:
 service:
   type: ClusterIP
 
-ingress:
-  enabled: false
-  className: ""
-  host: petstore.localhost
-  path: /
-
 database:
   enabled: true
   secretName: petstore-db

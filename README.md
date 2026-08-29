@@ -183,9 +183,10 @@ ConfigMap с дашбордами создаётся отдельной кома
 | Grafana          | `kubectl port-forward -n petstore svc/grafana 3000:3000`                                     |
 | Prometheus       | `kubectl port-forward -n petstore svc/prometheus 9090:9090`                                  |
 
-Объект `Ingress` на шлюз чарт создаёт (`petstore.localhost`), но в Docker Desktop нет
-ingress-контроллера: чтобы он заработал, нужно поставить, например, ingress-nginx. Пока его нет,
-вход — через `LoadBalancer` на 8080.
+Наружу смотрит только шлюз — у него `LoadBalancer`, у четырёх сервисов `ClusterIP`.
+До сервиса напрямую — `kubectl port-forward -n petstore svc/catalog-service 8081:8081`.
+
+Реплики добавляются на ходу:
 
 ```bash
 kubectl scale deployment/catalog-service -n petstore --replicas=3
@@ -273,7 +274,7 @@ jmeter -n -t load/jmeter/overload.jmx -l target/overload.jtl \
 `-JinventoryPort=8080 -JorderPort=8080`), но меряет уже шлюз; специально его ограничитель
 показывает `overload.jmx`.
 
-В Kubernetes сервисы наружу не смотрят (`ClusterIP`, Ingress только у шлюза), поэтому прямому
+В Kubernetes сервисы наружу не смотрят (`ClusterIP`, снаружи только шлюз), поэтому прямому
 прогону нужен проброс портов: `kubectl port-forward -n petstore svc/catalog-service 8081:8081`
 и так же для 8082 и 8084.
 
