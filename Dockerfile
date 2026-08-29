@@ -8,7 +8,7 @@ COPY benchmarks ./benchmarks
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -DskipTests -pl services/${SERVICE} -am package
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jdk
 ARG SERVICE
 COPY --from=build /src/services/${SERVICE}/target/${SERVICE}-*.jar /app.jar
 USER 1001:1001

@@ -1,27 +1,5 @@
 name: petstore
 
-x-app: &app
-  profiles: [apps]
-  restart: unless-stopped
-  networks: [petstore]
-
-x-build: &build
-  context: ..
-  dockerfile: Dockerfile
-
-x-env: &env
-  JAVA_OPTS: ${JAVA_OPTS:-}
-
-x-db-env: &db-env
-  DB_HOST: postgres
-  LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default}
-
-x-healthcheck: &healthcheck
-  interval: 10s
-  timeout: 5s
-  retries: 12
-  start_period: 60s
-
 services:
 
   postgres:
@@ -118,15 +96,19 @@ services:
     networks: [petstore]
 
   catalog-service:
-    <<: *app
+    restart: unless-stopped
+    networks: [petstore]
     image: petstore/catalog-service:0.1.0
     build:
-      <<: *build
+      context: ..
+      dockerfile: Dockerfile
       args:
         SERVICE: catalog-service
     container_name: petstore-catalog-service
     environment:
-      <<: [*env, *db-env]
+      JAVA_OPTS: ${JAVA_OPTS:-}
+      DB_HOST: postgres
+      LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default}
     ports:
       - "8081:8081"
       - "9101:9101"
@@ -134,19 +116,26 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/actuator/health/readiness"]
 
   inventory-service:
-    <<: *app
+    restart: unless-stopped
+    networks: [petstore]
     image: petstore/inventory-service:0.1.0
     build:
-      <<: *build
+      context: ..
+      dockerfile: Dockerfile
       args:
         SERVICE: inventory-service
     container_name: petstore-inventory-service
     environment:
-      <<: [*env, *db-env]
+      JAVA_OPTS: ${JAVA_OPTS:-}
+      DB_HOST: postgres
+      LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default}
       KAFKA_BOOTSTRAP: kafka:9092
     ports:
       - "8082:8082"
@@ -157,38 +146,52 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8082/actuator/health/readiness"]
 
   customer-service:
-    <<: *app
+    restart: unless-stopped
+    networks: [petstore]
     image: petstore/customer-service:0.1.0
     build:
-      <<: *build
+      context: ..
+      dockerfile: Dockerfile
       args:
         SERVICE: customer-service
     container_name: petstore-customer-service
     environment:
-      <<: [*env, *db-env]
+      JAVA_OPTS: ${JAVA_OPTS:-}
+      DB_HOST: postgres
+      LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default}
     ports:
       - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8083/actuator/health/readiness"]
 
   order-service:
-    <<: *app
+    restart: unless-stopped
+    networks: [petstore]
     image: petstore/order-service:0.1.0
     build:
-      <<: *build
+      context: ..
+      dockerfile: Dockerfile
       args:
         SERVICE: order-service
     container_name: petstore-order-service
     environment:
-      <<: [*env, *db-env]
+      JAVA_OPTS: ${JAVA_OPTS:-}
+      DB_HOST: postgres
+      LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default}
       KAFKA_BOOTSTRAP: kafka:9092
       CATALOG_GRPC: static://catalog-service:9101
       INVENTORY_GRPC: static://inventory-service:9102
@@ -201,19 +204,24 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8084/actuator/health/readiness"]
 
   api-gateway:
-    <<: *app
+    restart: unless-stopped
+    networks: [petstore]
     image: petstore/api-gateway:0.1.0
     build:
-      <<: *build
+      context: ..
+      dockerfile: Dockerfile
       args:
         SERVICE: api-gateway
     container_name: petstore-api-gateway
     environment:
-      <<: *env
+      JAVA_OPTS: ${JAVA_OPTS:-}
       CATALOG_URL: http://catalog-service:8081
       INVENTORY_URL: http://inventory-service:8082
       CUSTOMER_URL: http://customer-service:8083
@@ -221,7 +229,9 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      <<: *healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
       start_period: 30s
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
 

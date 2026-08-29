@@ -135,30 +135,27 @@ mvn -pl services/api-gateway spring-boot:run
 Образ у всех пяти сервисов собирается одним многоступенчатым `Dockerfile` в корне репозитория:
 имя модуля передаётся аргументом `SERVICE`, первая ступень (`maven:3.9.11-eclipse-temurin-21`)
 собирает jar командой `mvn -pl services/${SERVICE} -am -DskipTests package`, вторая
-(`eclipse-temurin:21-jre`) получает только jar и запускает его. Тесты в образе
+(`eclipse-temurin:21-jdk`) получает только jar и запускает его. Тесты в образе
 пропускаются намеренно: интеграционным нужен Testcontainers, то есть Docker внутри сборки, —
 они проходят раньше, в `mvn install`.
 
 Команда для сборки:
 
 ```bash
-docker compose -f deploy/docker-compose.yml --profile apps build
+docker compose -f deploy/docker-compose.yml build
 ```
 
 Инфраструктура вместе с сервисами:
 
 ```bash
-docker compose -f deploy/docker-compose.yml --profile apps up -d
+docker compose -f deploy/docker-compose.yml up -d
 ```
-
-Без `--profile apps` поднимается только инфраструктура — этот режим нужен для `spring-boot:run`
-из IDEA и для тестов, поэтому он и остался поведением по умолчанию.
 
 Демо-данные и JVM-флаги передаются переменными окружения самой команды:
 
 ```bash
-LIQUIBASE_CONTEXTS=demo docker compose -f deploy/docker-compose.yml --profile apps up -d
-JAVA_OPTS="-XX:+UseZGC -Xmx512m" docker compose -f deploy/docker-compose.yml --profile apps up -d
+LIQUIBASE_CONTEXTS=demo docker compose -f deploy/docker-compose.yml up -d
+JAVA_OPTS="-Xmx512m" docker compose -f deploy/docker-compose.yml up -d
 ```
 
 ## Запуск в Kubernetes
@@ -208,8 +205,8 @@ helm upgrade --install petstore deploy/helm/petstore -n petstore \
 
 Каждый сервис отдаёт метрики на `/actuator/prometheus`. Prometheus из `docker-compose` собирает их
 статическими таргетами `host.docker.internal:8080`…`8084`. Адрес один на оба режима: он ведёт
-на хост, а туда published-портами выходят и процессы, запущенные через `spring-boot:run`,
-и контейнеры профиля `apps`. Живы ли все пять целей, видно на http://localhost:9090/targets.
+на хост, а туда published-портами выходят и контейнеры сервисов, и процессы, запущенные
+через `spring-boot:run`. Живы ли все пять целей, видно на http://localhost:9090/targets.
 
 Grafana поднимается уже настроенной: `deploy/grafana/provisioning/` заводит источник данных
 и папку `PetStore`, дашборды берутся из `deploy/grafana/dashboards/`.
@@ -246,7 +243,7 @@ Relabeling кладёт имя пода в `instance`, поэтому панел
 | `overload.jmx`                 | перегрузка: bulkhead сервиса и rate limiter шлюза                                                                                         |
 
 Перед прогоном поднимаются инфраструктура и пять сервисов
-(`docker compose -f deploy/docker-compose.yml --profile apps up -d` либо Helm).
+(`docker compose -f deploy/docker-compose.yml up -d` либо Helm).
 
 ```bash
 # функциональный прогон — 37 запросов, всё должно быть зелёным

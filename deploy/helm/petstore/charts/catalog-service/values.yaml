@@ -26,7 +26,7 @@ resources:
     memory: 768Mi
 
 env:
-  JAVA_OPTS: "-Xmx512m"
+  JAVA_OPTS: "-Xmx512m -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
   DB_HOST: postgres
   DB_PORT: "5432"
   LIQUIBASE_CONTEXTS: default

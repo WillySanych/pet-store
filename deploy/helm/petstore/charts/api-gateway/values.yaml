@@ -24,7 +24,7 @@ resources:
     memory: 512Mi
 
 env:
-  JAVA_OPTS: "-Xmx256m"
+  JAVA_OPTS: "-Xmx256m -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
   CATALOG_URL: http://catalog-service:8081
   INVENTORY_URL: http://inventory-service:8082
   CUSTOMER_URL: http://customer-service:8083

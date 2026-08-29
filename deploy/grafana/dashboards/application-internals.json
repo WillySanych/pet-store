@@ -398,7 +398,7 @@
       "type": "timeseries",
       "id": 32,
       "title": "Паузы GC",
-      "description": "Доля времени в паузах и самая долгая пауза за интервал. Именно эти два ряда сравниваются между G1 и ZGC.",
+      "description": "Доля времени в паузах и самая долгая пауза за интервал.",
       "datasource": { "type": "prometheus", "uid": "${ds}" },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
       "fieldConfig": {
