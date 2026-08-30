@@ -9,7 +9,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
@@ -40,10 +39,6 @@ public class StockItem {
     @Column(nullable = false)
     private int reserved;
 
-    @Version
-    @Column(nullable = false)
-    private long version;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -63,28 +58,6 @@ public class StockItem {
 
     public int available() {
         return quantity - reserved;
-    }
-
-    public void reserve(int amount) {
-        if (amount > available()) {
-            throw new IllegalStateException("Cannot reserve " + amount + " of product " + productId
-                    + ": only " + available() + " available");
-        }
-        reserved += amount;
-    }
-
-    public void releaseReserved(int amount) {
-        if (amount > reserved) {
-            throw new IllegalStateException("Cannot release " + amount + " of product " + productId
-                    + ": only " + reserved + " reserved");
-        }
-        reserved -= amount;
-    }
-
-    /** Ships the held amount: it leaves both {@code reserved} and {@code quantity}. */
-    public void commitReserved(int amount) {
-        releaseReserved(amount);
-        quantity -= amount;
     }
 
     public UUID getId() {
@@ -125,10 +98,6 @@ public class StockItem {
 
     public void setReserved(int reserved) {
         this.reserved = reserved;
-    }
-
-    public long getVersion() {
-        return version;
     }
 
     public Instant getCreatedAt() {

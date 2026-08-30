@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="petstore — чтение каталога">
-      <stringProp name="TestPlan.comments">Чтение каталога напрямую в catalog-service, мимо шлюза: сколько rps держит сервис и как ведёт себя latency.
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="petstore — rate limit шлюза">
+      <stringProp name="TestPlan.comments">Проверка rate limiter шлюза
+(SemaphoreRateLimiter, GATEWAY_RATE_LIMIT = 500 запросов в секунду).
 
-Параметры: -Jhost=localhost -JcatalogPort=8081 -Jthreads=50 -Jrampup=15 -Jduration=180</stringProp>
+Нагрузка идёт только через шлюз (порт 8080) по дешёвому эндпоинту справочника.
+
+Ожидаемый результат: шлюз не падает, часть запросов отвечает 429 RATE_LIMITED,
+latency успешных запросов остаётся стабильной, растёт petstore_overload_rejected_total
+с меткой service=api-gateway и падает gauge petstore_ratelimit_available.
+Поэтому 429 здесь — не ошибка: ассерт принимает 200 и 429 с «игнорировать статус»,
+иначе JMeter засчитал бы каждый отказ ограничителя в ошибки.
+Разбивка по кодам смотрится в .jtl или на дашборде Grafana.
+
+Параметры: -Jhost=localhost -JgatewayPort=8080
+           -JgatewayThreads=150 -Jrampup=5 -Jduration=120</stringProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="Переменные плана">
         <collectionProp name="Arguments.arguments">
@@ -13,14 +24,14 @@
             <stringProp name="Argument.value">${__P(host,localhost)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
-          <elementProp name="catalogPort" elementType="Argument">
-            <stringProp name="Argument.name">catalogPort</stringProp>
-            <stringProp name="Argument.value">${__P(catalogPort,8081)}</stringProp>
+          <elementProp name="gatewayPort" elementType="Argument">
+            <stringProp name="Argument.name">gatewayPort</stringProp>
+            <stringProp name="Argument.value">${__P(gatewayPort,8080)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="requestIdPrefix" elementType="Argument">
             <stringProp name="Argument.name">requestIdPrefix</stringProp>
-            <stringProp name="Argument.value">catalog-read</stringProp>
+            <stringProp name="Argument.value">gateway-rate-limit</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
         </collectionProp>
@@ -33,7 +44,6 @@
         <intProp name="HTTPSampler.connect_timeout">5000</intProp>
         <intProp name="HTTPSampler.response_timeout">30000</intProp>
         <stringProp name="HTTPSampler.domain">${host}</stringProp>
-        <stringProp name="HTTPSampler.port">${catalogPort}</stringProp>
         <stringProp name="HTTPSampler.protocol">http</stringProp>
         <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
         <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
@@ -59,11 +69,11 @@
         </collectionProp>
       </HeaderManager>
       <hashTree/>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Чтение каталога" enabled="true">
-        <stringProp name="TestPlan.comments">Закрытая модель без пауз: потоки упираются в сервис, потолок rps — то, что он выдерживает.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(threads,60)}</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">${__P(rampup,15)}</stringProp>
-        <stringProp name="ThreadGroup.duration">${__P(duration,180)}</stringProp>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Rate limit шлюза" enabled="true">
+        <stringProp name="TestPlan.comments">Через шлюз по дешёвому эндпоинту: упирается в 500 запросов в секунду, лишнее — 429 RATE_LIMITED.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(gatewayThreads,150)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(rampup,5)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(duration,120)}</stringProp>
         <longProp name="ThreadGroup.delay">0</longProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
@@ -74,95 +84,12 @@
         </elementProp>
       </ThreadGroup>
       <hashTree>
-        <RandomVariableConfig guiclass="TestBeanGUI" testclass="RandomVariableConfig" testname="Случайный productSuffix" enabled="true">
-          <stringProp name="variableName">productSuffix</stringProp>
-          <stringProp name="outputFormat">000000000000</stringProp>
-          <stringProp name="minimumValue">1</stringProp>
-          <stringProp name="maximumValue">120</stringProp>
-          <stringProp name="randomSeed"></stringProp>
-          <boolProp name="perThread">true</boolProp>
-        </RandomVariableConfig>
-        <hashTree/>
-        <RandomVariableConfig guiclass="TestBeanGUI" testclass="RandomVariableConfig" testname="Случайный pageNo" enabled="true">
-          <stringProp name="variableName">pageNo</stringProp>
-          <stringProp name="outputFormat">0</stringProp>
-          <stringProp name="minimumValue">0</stringProp>
-          <stringProp name="maximumValue">4</stringProp>
-          <stringProp name="randomSeed"></stringProp>
-          <boolProp name="perThread">true</boolProp>
-        </RandomVariableConfig>
-        <hashTree/>
-        <TransactionController guiclass="TransactionControllerGui" testclass="TransactionController" testname="Чтение каталога" enabled="true">
+        <TransactionController guiclass="TransactionControllerGui" testclass="TransactionController" testname="Перегрузка шлюза" enabled="true">
           <boolProp name="TransactionController.includeTimers">false</boolProp>
         </TransactionController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /api/v1/products (страница)" enabled="true">
-            <stringProp name="HTTPSampler.path">/api/v1/products?page=${pageNo}&amp;size=20&amp;sort=name,asc</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <stringProp name="HTTPSampler.method">GET</stringProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
-              <collectionProp name="Arguments.arguments"/>
-            </elementProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Код 200" enabled="true">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.custom_message"></stringProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-          </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /api/v1/products/{id}" enabled="true">
-            <stringProp name="HTTPSampler.path">/api/v1/products/a0000000-0000-4000-8000-${productSuffix}</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <stringProp name="HTTPSampler.method">GET</stringProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
-              <collectionProp name="Arguments.arguments"/>
-            </elementProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Код 200" enabled="true">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.custom_message"></stringProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-          </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /api/v1/products (фильтр по справочнику)" enabled="true">
-            <stringProp name="HTTPSampler.path">/api/v1/products?category=FOOD&amp;active=true&amp;page=0&amp;size=20&amp;sort=name,asc</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <stringProp name="HTTPSampler.method">GET</stringProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
-              <collectionProp name="Arguments.arguments"/>
-            </elementProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Код 200" enabled="true">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.custom_message"></stringProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-          </hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /api/v1/categories (кеш справочника)" enabled="true">
+            <stringProp name="HTTPSampler.port">${gatewayPort}</stringProp>
             <stringProp name="HTTPSampler.path">/api/v1/categories</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <stringProp name="HTTPSampler.method">GET</stringProp>
@@ -173,14 +100,14 @@
             </elementProp>
           </HTTPSamplerProxy>
           <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Код 200" enabled="true">
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Код 200 или 429 — шлюз отвечает" enabled="true">
               <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
+                <stringProp name="-1447182287">200|429</stringProp>
               </collectionProp>
               <stringProp name="Assertion.custom_message"></stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
+              <boolProp name="Assertion.assume_success">true</boolProp>
+              <intProp name="Assertion.test_type">1</intProp>
             </ResponseAssertion>
             <hashTree/>
           </hashTree>

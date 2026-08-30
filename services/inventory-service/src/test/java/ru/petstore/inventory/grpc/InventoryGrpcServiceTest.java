@@ -23,7 +23,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import ru.petstore.common.metrics.ServiceMetrics;
 import ru.petstore.common.web.ServiceUnavailableException;
 import ru.petstore.inventory.service.ConcurrentReservationException;
@@ -171,17 +170,6 @@ class InventoryGrpcServiceTest {
     void lostRaceIsReportedAsAborted() {
         when(reservationService.reserve(any(), any()))
                 .thenThrow(new ConcurrentReservationException(orderId, new RuntimeException("duplicate key")));
-
-        service().reserve(reserveRequest(), reserveObserver);
-
-        assertThat(reserveErrorCode()).isEqualTo(Status.Code.ABORTED);
-    }
-
-    @Test
-    @DisplayName("Конфликт версий остатка — тоже ABORTED, а не UNAVAILABLE")
-    void optimisticLockIsReportedAsAborted() {
-        when(reservationService.reserve(any(), any()))
-                .thenThrow(new ObjectOptimisticLockingFailureException("stock_item", productId));
 
         service().reserve(reserveRequest(), reserveObserver);
 

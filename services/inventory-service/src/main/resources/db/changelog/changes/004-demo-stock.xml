@@ -12,9 +12,9 @@
             The last two are deliberate edge cases: nothing left, and one single item.
         </comment>
         <sql>
-            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved, version,
+            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved,
                                     created_at, updated_at)
-            SELECT gen_random_uuid(), v.product_id::uuid, w.id, v.quantity, 0, 0, now(), now()
+            SELECT gen_random_uuid(), v.product_id::uuid, w.id, v.quantity, 0, now(), now()
             FROM (VALUES
                 ('a0000000-0000-4000-8000-000000000001', 40, 'MSK'),
                 ('a0000000-0000-4000-8000-000000000002', 35, 'MSK'),
@@ -48,11 +48,11 @@
             warehouses: every demo product stays orderable, not just the twelve named ones.
         </comment>
         <sql>
-            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved, version,
+            INSERT INTO stock_item (id, product_id, warehouse_id, quantity, reserved,
                                     created_at, updated_at)
             SELECT gen_random_uuid(),
                    ('a0000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
-                   w.id, 300 + (n % 10) * 100, 0, 0, now(), now()
+                   w.id, 300 + (n % 10) * 100, 0, now(), now()
             FROM generate_series(13, 120) AS n
             JOIN warehouse w ON w.code = (ARRAY['MSK', 'SPB', 'EKB'])[1 + n % 3];
         </sql>

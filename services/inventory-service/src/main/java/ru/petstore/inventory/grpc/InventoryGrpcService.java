@@ -13,7 +13,6 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import ru.petstore.common.metrics.ServiceMetrics;
 import ru.petstore.common.web.ServiceUnavailableException;
 import ru.petstore.inventory.service.ConcurrentReservationException;
@@ -118,7 +117,7 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
         } catch (ReservationStateException e) {
             log.warn("{} refused: {}", endpoint, e.getMessage());
             throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
-        } catch (ConcurrentReservationException | OptimisticLockingFailureException e) {
+        } catch (ConcurrentReservationException e) {
             log.warn("{} lost a race, asking the caller to retry: {}", endpoint, e.getMessage());
             throw Status.ABORTED.withDescription("Concurrent change, retry the request").asRuntimeException();
         } catch (ServiceUnavailableException e) {

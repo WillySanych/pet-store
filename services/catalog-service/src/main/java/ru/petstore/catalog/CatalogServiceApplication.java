@@ -2,11 +2,13 @@ package ru.petstore.catalog;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @OpenAPIDefinition(info = @Info(title = "catalog-service API", version = "v1",
-        description = "Товары и справочники каталога."))
+        description = "Товары и справочники каталога."),
+        servers = @Server(url = "/"))
 @SpringBootApplication
 public class CatalogServiceApplication {
 

@@ -144,9 +144,9 @@ public class OrderService {
     private OrderCreation place(OrderRequest request, String key) {
         Map<UUID, Integer> lines = aggregate(request.items());
 
-        Optional<OrderResponse> replayed = replay(request.customerId(), key);
-        if (replayed.isPresent()) {
-            return new OrderCreation(replayed.get(), false);
+        Optional<OrderResponse> existing = findExistingByIdempotencyKey(request.customerId(), key);
+        if (existing.isPresent()) {
+            return new OrderCreation(existing.get(), false);
         }
 
         ReferenceItem status = references.statusItem(OrderStatusCode.NEW);
@@ -218,7 +218,7 @@ public class OrderService {
         }
     }
 
-    private Optional<OrderResponse> replay(UUID customerId, String key) {
+    private Optional<OrderResponse> findExistingByIdempotencyKey(UUID customerId, String key) {
         if (key == null) {
             return Optional.empty();
         }
@@ -232,7 +232,7 @@ public class OrderService {
         if (key == null || !cause.contains(IDEMPOTENCY_INDEX)) {
             throw e;
         }
-        return replay(customerId, key)
+        return findExistingByIdempotencyKey(customerId, key)
                 .map(order -> new OrderCreation(order, false))
                 .orElseThrow(() -> new ConcurrentChangeException(
                         "Order with idempotency key " + key + " is being created by another request", e));

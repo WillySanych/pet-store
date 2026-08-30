@@ -7,20 +7,21 @@ import static ru.petstore.inventory.domain.ReservationStatusCode.RELEASED;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import ru.petstore.common.metrics.ServiceMetrics;
 import ru.petstore.common.reference.ReferenceDataService;
 import ru.petstore.inventory.config.InventoryProperties;
@@ -28,13 +29,11 @@ import ru.petstore.inventory.domain.Reservation;
 import ru.petstore.inventory.domain.ReservationItem;
 import ru.petstore.inventory.domain.ReservationStatus;
 import ru.petstore.inventory.domain.ReservationStatusCode;
-import ru.petstore.inventory.domain.StockItem;
 import ru.petstore.inventory.repository.ReservationRepository;
 import ru.petstore.inventory.repository.ReservationStatusRepository;
 import ru.petstore.inventory.repository.StockItemRepository;
 
 @Service
-@Transactional(readOnly = true)
 public class ReservationService {
 
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
@@ -45,40 +44,46 @@ public class ReservationService {
     private final ReferenceDataService referenceDataService;
     private final ServiceMetrics serviceMetrics;
     private final InventoryProperties inventoryProperties;
+    private final TransactionTemplate transactionTemplate;
 
     public ReservationService(ReservationRepository reservationRepository,
                               StockItemRepository stockItemRepository,
                               ReservationStatusRepository reservationStatusRepository,
                               ReferenceDataService referenceDataService,
                               ServiceMetrics serviceMetrics,
-                              InventoryProperties inventoryProperties) {
+                              InventoryProperties inventoryProperties,
+                              PlatformTransactionManager transactionManager) {
         this.reservationRepository = reservationRepository;
         this.stockItemRepository = stockItemRepository;
         this.reservationStatusRepository = reservationStatusRepository;
         this.referenceDataService = referenceDataService;
         this.serviceMetrics = serviceMetrics;
         this.inventoryProperties = inventoryProperties;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public ReserveOutcome reserve(UUID orderId, List<ReserveLine> lines) {
         requireOrderId(orderId);
         Map<UUID, Integer> requested = aggregate(lines);
+        return Objects.requireNonNull(transactionTemplate.execute(
+                transaction -> reserveInTransaction(orderId, requested, transaction)));
+    }
 
-        Optional<Reservation> existing = reservationRepository.findByOrderId(orderId);
+    private ReserveOutcome reserveInTransaction(UUID orderId, Map<UUID, Integer> requested,
+                                                TransactionStatus transaction) {
+        Optional<Reservation> existing = reservationRepository.findByOrderIdForUpdate(orderId);
         if (existing.isPresent()) {
             return outcomeOfExisting(existing.get());
         }
 
-        Map<UUID, StockItem> stock = stockByProduct(requested.keySet());
         List<UUID> unavailable = new ArrayList<>();
-        requested.forEach((productId, quantity) -> {
-            StockItem item = stock.get(productId);
-            if (item == null || item.available() < quantity) {
-                unavailable.add(productId);
+        for (Map.Entry<UUID, Integer> line : sortedLines(requested)) {
+            if (stockItemRepository.reserveIfAvailable(line.getKey(), line.getValue()) == 0) {
+                unavailable.add(line.getKey());
             }
-        });
+        }
         if (!unavailable.isEmpty()) {
+            transaction.setRollbackOnly();
             log.debug("Reserve for order {} refused, short of {}", orderId, unavailable);
             return ReserveOutcome.refused(unavailable);
         }
@@ -87,10 +92,7 @@ public class ReservationService {
         reservation.setOrderId(orderId);
         reservation.setStatus(statusRef(ACTIVE));
         reservation.setExpiresAt(Instant.now().plus(inventoryProperties.getReservationTtl()));
-        requested.forEach((productId, quantity) -> {
-            stock.get(productId).reserve(quantity);
-            reservation.addItem(productId, quantity);
-        });
+        sortedLines(requested).forEach(line -> reservation.addItem(line.getKey(), line.getValue()));
 
         try {
             reservationRepository.saveAndFlush(reservation);
@@ -105,7 +107,7 @@ public class ReservationService {
     @Transactional
     public boolean release(UUID orderId) {
         requireOrderId(orderId);
-        Reservation reservation = reservationRepository.findByOrderId(orderId).orElse(null);
+        Reservation reservation = reservationRepository.findByOrderIdForUpdate(orderId).orElse(null);
         if (reservation == null) {
             log.debug("Release for order {}: no reservation, nothing to do", orderId);
             return true;
@@ -127,7 +129,7 @@ public class ReservationService {
     @Transactional
     public boolean commit(UUID orderId) {
         requireOrderId(orderId);
-        Reservation reservation = reservationRepository.findByOrderId(orderId).orElse(null);
+        Reservation reservation = reservationRepository.findByOrderIdForUpdate(orderId).orElse(null);
         if (reservation == null) {
             serviceMetrics.recordError("confirm_without_reservation");
             log.error("ORDER_CONFIRMED for order {} found no reservation", orderId);
@@ -144,21 +146,18 @@ public class ReservationService {
             return false;
         }
 
-        Map<UUID, StockItem> stock = stockByProduct(productIds(reservation));
-        for (ReservationItem item : reservation.getItems()) {
-            StockItem stockItem = stock.get(item.getProductId());
-            if (stockItem == null) {
+        for (ReservationItem item : sortedItems(reservation)) {
+            if (stockItemRepository.commitIfReserved(item.getProductId(), item.getQuantity()) == 0) {
                 serviceMetrics.recordError("stock_missing_on_confirm");
-                log.error("No stock row for product {} held by order {}", item.getProductId(), orderId);
-                continue;
+                throw inconsistentStock("commit", reservation, item);
             }
-            stockItem.commitReserved(item.getQuantity());
         }
         reservation.setStatus(statusRef(COMMITTED));
         log.debug("Order {} written off {} product(s)", orderId, reservation.getItems().size());
         return true;
     }
 
+    @Transactional(readOnly = true)
     public List<UUID> expiredReservationIds() {
         return reservationRepository.findOverdueIds(
                 ACTIVE.code(), Instant.now(), Limit.of(inventoryProperties.getExpiryBatchSize()));
@@ -166,7 +165,7 @@ public class ReservationService {
 
     @Transactional
     public boolean releaseExpired(UUID reservationId) {
-        Reservation reservation = reservationRepository.findWithItemsById(reservationId).orElse(null);
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElse(null);
         if (reservation == null || !reservation.hasStatus(ACTIVE)) {
             return false;
         }
@@ -175,16 +174,11 @@ public class ReservationService {
     }
 
     private void giveBack(Reservation reservation, ReservationStatusCode newStatus) {
-        Map<UUID, StockItem> stock = stockByProduct(productIds(reservation));
-        for (ReservationItem item : reservation.getItems()) {
-            StockItem stockItem = stock.get(item.getProductId());
-            if (stockItem == null) {
+        for (ReservationItem item : sortedItems(reservation)) {
+            if (stockItemRepository.releaseIfReserved(item.getProductId(), item.getQuantity()) == 0) {
                 serviceMetrics.recordError("stock_missing_on_release");
-                log.error("No stock row for product {} held by order {}",
-                        item.getProductId(), reservation.getOrderId());
-                continue;
+                throw inconsistentStock("release", reservation, item);
             }
-            stockItem.releaseReserved(item.getQuantity());
         }
         reservation.setStatus(statusRef(newStatus));
     }
@@ -210,18 +204,31 @@ public class ReservationService {
                 throw new IllegalArgumentException(
                         "Quantity for product " + line.productId() + " must be positive");
             }
-            requested.merge(line.productId(), line.quantity(), Integer::sum);
+            try {
+                requested.merge(line.productId(), line.quantity(), Math::addExact);
+            } catch (ArithmeticException e) {
+                throw new IllegalArgumentException(
+                        "Total quantity for product " + line.productId() + " is too large", e);
+            }
         }
         return requested;
     }
 
-    private Map<UUID, StockItem> stockByProduct(Collection<UUID> productIds) {
-        return stockItemRepository.findAllByProductIdIn(productIds).stream()
-                .collect(Collectors.toMap(StockItem::getProductId, Function.identity()));
+    private static List<Map.Entry<UUID, Integer>> sortedLines(Map<UUID, Integer> requested) {
+        return requested.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList();
     }
 
-    private static List<UUID> productIds(Reservation reservation) {
-        return reservation.getItems().stream().map(ReservationItem::getProductId).toList();
+    private static List<ReservationItem> sortedItems(Reservation reservation) {
+        return reservation.getItems().stream()
+                .sorted((left, right) -> left.getProductId().compareTo(right.getProductId()))
+                .toList();
+    }
+
+    private static IllegalStateException inconsistentStock(String operation, Reservation reservation,
+                                                           ReservationItem item) {
+        return new IllegalStateException("Cannot " + operation + " " + item.getQuantity()
+                + " reserved unit(s) of product " + item.getProductId() + " for order "
+                + reservation.getOrderId() + ": stock row is missing or inconsistent");
     }
 
     private ReservationStatus statusRef(ReservationStatusCode code) {

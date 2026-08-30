@@ -83,8 +83,10 @@ class ReservationFlowTest extends AbstractPostgresTest {
     @Test
     @DisplayName("Нехватки остатка достаточно, чтобы не удержать ничего")
     void reserveIsAllOrNothing() {
-        UUID plenty = productWithStock(10);
-        UUID scarce = productWithStock(1);
+        UUID plenty = UUID.fromString("10000000-0000-4000-8000-000000000001");
+        UUID scarce = UUID.fromString("20000000-0000-4000-8000-000000000001");
+        stockService.set(plenty, new StockRequest("MSK", 10));
+        stockService.set(scarce, new StockRequest("MSK", 1));
 
         var outcome = reservationService.reserve(UUID.randomUUID(),
                 List.of(new ReserveLine(plenty, 2), new ReserveLine(scarce, 5)));
@@ -254,6 +256,10 @@ class ReservationFlowTest extends AbstractPostgresTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> reservationService.reserve(UUID.randomUUID(), lines(product, -1)))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reservationService.reserve(UUID.randomUUID(), List.of(
+                new ReserveLine(product, Integer.MAX_VALUE), new ReserveLine(product, 1))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too large");
         assertThatThrownBy(() -> reservationService.reserve(null, lines(product, 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }

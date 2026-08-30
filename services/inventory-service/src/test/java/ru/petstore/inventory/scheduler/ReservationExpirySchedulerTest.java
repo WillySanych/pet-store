@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import ru.petstore.inventory.service.ReservationService;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,11 +28,11 @@ class ReservationExpirySchedulerTest {
     }
 
     @Test
-    @DisplayName("Проигранная гонка по одному резерву не отменяет остальные")
-    void lostRaceOnOneReservationDoesNotStopTheRest() {
+    @DisplayName("Ошибка одного резерва не отменяет обработку остальных")
+    void failureOnOneReservationDoesNotStopTheRest() {
         when(reservationService.expiredReservationIds()).thenReturn(List.of(first, second));
         when(reservationService.releaseExpired(first))
-                .thenThrow(new ObjectOptimisticLockingFailureException("stock_item", first));
+                .thenThrow(new IllegalStateException("inconsistent stock"));
 
         assertThatCode(this::sweep).doesNotThrowAnyException();
 
